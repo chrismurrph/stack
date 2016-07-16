@@ -23,6 +23,12 @@
   (let [factor (Math/pow 10 precision)]
     (/ (Math/round (* d factor)) factor)))
 
+(defn divide [num div]
+  (let [res (/ num div)
+        ;_ (assert (= res (int res)) (str "Got back fraction: " res))
+        ]
+    (round 0 res)))
+
 ;;
 ;; from-world and to-world are maps of type {:min _ :max _}
 ;; These max and min are inclusive, so the exact middle when :min 0 and :max 10 is 5
@@ -38,7 +44,7 @@
         to-diff (- max-to min-to)
         from-proportion (/ (- from-val min-from) from-diff)
         res (* to-diff from-proportion)
-        rounded-res (round 0 res)
+        rounded-res (int (Math/ceil res))
         ;_ (println "FROM VAL:" from-val " | RES:" rounded-res " | " res " | F:" from-world " | T:" to-world)
         ]
     rounded-res))

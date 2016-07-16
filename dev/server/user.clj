@@ -562,103 +562,164 @@
 (defn x-23 []
   (pascals-triangle 4))
 
-(defn margin [inner outer]
-  (let [
-        ;_ (println "inner: " inner "outer: " outer)
-        _ (assert (>= outer inner) (str inner " not less than " outer))
-        diff (- outer inner)]
-    (quot diff 2)))
+(defn two-strings []
+  (let [input (line-seq (java.io.BufferedReader. *in*))
+        [one two] input
+        res (interleave one two)]
+    (println res)))
 
-(seq? [])
-
-(defn foo [& bar] (if (apply = bar 12) 1 2))
-
-(defn outside-triangles-square? [{:keys [loc-row loc-col] :as location}
-                                 {:keys [row col width height] :as triangle}]
-  (cond
-    (< loc-row row) true
-    (>= loc-row (+ row height)) true
-    (< loc-col col) true
-    (>= loc-col (+ col width)) true
-    :default false))
-
-;;
-;; Depending on which row you are on there will be more columns printed
-;; To world is from col to (col + width) columns
-;; From world is rows - at the biggest row we want to see max num colums returned
-;;
-(defn triangle-pixel-on? [{:keys [loc-row loc-col] :as location}
-                          {:keys [row col width height] :as triangle}]
-  (if (outside-triangles-square? location triangle)
-    false
-    (let [from-world {:min row :max (+ row (dec height))}
-          ;_ (println "loc-row: " loc-row)
-          ;_ (println "from: " from-world)
-          to-world {:min col :max (+ col (dec width))}
-          ;_ (println "to: " to-world)
-          on-count (inc (u/scale from-world to-world loc-row))
-          ;_ (println "at top: " on-count)
-          indent (margin on-count width)
-          start (+ col indent)
-          end (+ col indent on-count)
-          between? (and (>= loc-col start) (< loc-col end))
-          ]
-      between?)))
-
-;;
-;; As soon as is on one we break out
-;;
-(defn triangle-pixel-on-many? [triangles location]
-  (let [on-fn? (partial triangle-pixel-on? location)
-        on? (some on-fn? triangles)]
-    on?))
-
-(defn multiply [{:keys [row col width height] :as triangle}]
-  (let [small-width (quot width 2)
-        small-height (quot height 2)
-        default {:width small-width :height small-height}
-        top (assoc default
-              :row row
-              :col (quot (+ col width) 4))
-        lower-left (assoc default
-                     :row (quot (+ row height) 2)
-                     :col (+ col 0))
-        lower-right (assoc default
-                      :row (quot (+ row height) 2)
-                      :col (quot (+ col width) 2))]
-    {:top top :lower-left lower-left :lower-right lower-right}))
-
-(defn create-all [depth triangle]
-  (let [triangles (multiply triangle)
-        dep (dec depth)]
-    (if (pos? dep)
-      (flatten (remove nil? [(create-all dep (:top triangles))
-                             (create-all dep (:lower-left triangles))
-                             (create-all dep (:lower-right triangles))]))
-      (list triangle))))
-
-(defn draw [triangles]
-  (let [on? (partial triangle-pixel-on-many? triangles)]
-    (doseq [row (range 32)]
-      (doseq [col (range 63)]
-        (let [nl? (= col 62)
-              draw? (on? {:loc-col col :loc-row row})
-              what (if draw? "1" "_")]
-          (print what)
-          (when nl?
-            (print "\n")))))))
-
-(defn x []
-  (let [triangles (create-all 2 {:row 0 :col 0 :width 63 :height 32})
-        _ (println triangles)]
-    (draw triangles)))
-
-(defn x-25 []
-  (let [tri {:width 31, :height 16, :row 0, :col 15}
-        loc {:loc-col 23 :loc-row 0}
-        res? (triangle-pixel-on? loc tri)]
-    res?))
+(defn permute [s]
+  (let [swap (fn [pair] `(~(second pair) ~(first pair)))
+        parts (partition 2 s)
+        swapped (apply str (flatten (map swap parts)))]
+    swapped))
 
 (defn x-24 []
-  (create-all 2 {:row 0 :col 0 :width 63 :height 32}))
+  (let [permute (fn [s]
+                  (let [swap (fn [pair] `(~(second pair) ~(first pair)))
+                        parts (partition 2 s)
+                        swapped (apply str (flatten (map swap parts)))]
+                    swapped))
+        input (next (line-seq (java.io.BufferedReader. *in*)))
+        res (map permute input)
+        ]
+    (doseq [v res]
+      (println v))))
+
+(defn x-25
+  []
+  (let [fibonacci-seq (fn [num]
+                        (loop [acc [1 1]
+                               ele-at 2]
+                          (if (= ele-at (dec num))
+                            (last (into [0] acc))
+                            (let [prior-val (nth acc (dec ele-at))
+                                  prior-prior-val (nth acc (- ele-at 2))
+                                  next-val (+ prior-val prior-prior-val)]
+                              (recur (conj acc next-val) (inc ele-at))))))
+        input (line-seq (java.io.BufferedReader. *in*))
+        num (Integer/parseInt (first input))
+        res (fibonacci-seq num)
+        ]
+    (println res)))
+
+;(defn compress-str [s]
+;  (let [input (line-seq (java.io.BufferedReader. *in*))
+;        s (first input)
+;        [h & t] s]
+;    (if t
+;      (let [sames (take-while #{h} t)
+;            contig-count (inc (count sames))]
+;        (cond
+;          (> contig-count 1) (str h contig-count (compress-str (drop (dec contig-count) t)))
+;          (= contig-count 1) (str h (compress-str t))))
+;      h)))
+
+(defn x-26 []
+  (letfn [(compress-str [strin]
+            (let [[h & t] strin]
+              (if t
+                (let [sames (take-while #{h} t)
+                      names-count (count sames)
+                      contig-count (inc names-count)]
+                  (cond
+                    (= contig-count 1)
+                    (do
+                      (str h (compress-str t)))
+
+                    (> contig-count 1)
+                    (let [from (drop names-count t)]
+                      (str (str h contig-count) (compress-str from)))
+                    ))
+                h)))]
+    (let [
+          input (line-seq (java.io.BufferedReader. *in*))
+          ;input "abcaaabbbcc"
+          s (first input)
+          res (compress-str s)]
+      (println res))
+    ))
+
+(defn x-27
+  []
+  (let [sz-at-front (fn [s] (str (count s) " " s))
+        common-prefix (fn [str-1 str-2]
+                        (loop [acc ""]
+                          (let [len (count acc)
+                                str-1-done (<= (count str-1) len)
+                                str-2-done (<= (count str-2) len)
+                                both-done (and str-1-done str-2-done)
+                                val-str-1 (when (not str-1-done) (nth str-1 len))
+                                val-str-2 (when (not str-2-done) (nth str-2 len))]
+                            (cond
+                              both-done acc
+                              (= val-str-1 val-str-2) (recur (str acc val-str-1))
+                              :default acc
+                              ))))
+        [one two] (line-seq (java.io.BufferedReader. *in*))
+        ;one "puppy"
+        ;two "puppy"
+        prefix (common-prefix one two)
+        sz-prefix (count prefix)
+        rest-one (subs one sz-prefix)
+        rest-two (subs two sz-prefix)
+        res [(sz-at-front prefix) (sz-at-front rest-one) (sz-at-front rest-two)]
+        ]
+    (doseq [v res]
+      (println v))))
+
+(defn x-28
+  []
+  (let [skip-agains (fn [in]
+                      (reduce
+                        (fn [acc ele]
+                          (let [ele-as-str (str ele)]
+                            (if (.contains acc ele-as-str)
+                              acc
+                              (str acc ele))))
+                        ""
+                        in))
+        [one] (line-seq (java.io.BufferedReader. *in*))
+        ;one "accabb"
+        res (skip-agains one)]
+    (println res)))
+
+(defn x
+  []
+  (let [to-out-str (fn [m] (if (:failed m) "False" "True"))
+        abs (fn [val]
+              (if (neg? val)
+                (* -1 val)
+                val))
+        check-overall-rules (fn [m]
+                              (let [r-g-eq (= (:red m) (:green m))
+                                    y-b-eq (= (:yellow m) (:blue m))
+                                    both-eq (and y-b-eq r-g-eq)]
+                                (assoc m :failed (not both-eq))))
+        check-prefix-rules (fn [in]
+                             (reduce
+                               (fn [acc ele]
+                                 (if (:failed acc)
+                                   acc
+                                   (let [ele-as-str (str ele)
+                                         colour-kw (case ele-as-str
+                                                     "R" :red
+                                                     "G" :green
+                                                     "Y" :yellow
+                                                     "B" :blue)]
+                                     (-> acc
+                                         (update colour-kw inc)
+                                         (assoc :failed (let [r-g-diff (abs (- (:red acc) (:green acc)))
+                                                              y-b-diff (abs (- (:yellow acc) (:blue acc)))]
+                                                          (or (> r-g-diff 1) (> y-b-diff 1))))))))
+                               {:red 0 :green 0 :yellow 0 :blue 0 :failed false}
+                               in))
+        lines (line-seq (java.io.BufferedReader. *in*))
+        ;lines ["4" "RGGR" "RYBG" "RYRB" "YGYGRBRB"]
+        res (map (comp check-overall-rules check-prefix-rules) (next lines))
+        outs (map to-out-str res)]
+    (doseq [v outs]
+      (println v))))
+
+
 
