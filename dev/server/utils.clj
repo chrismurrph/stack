@@ -29,6 +29,33 @@
         ]
     (round 0 res)))
 
+(defn gcd [a b]
+  (let [greatest (max a b)
+        least (if (= greatest a) b a)
+        end-point (min (Math/floor (/ greatest 2)) least)]
+    (loop [res 1
+           where-at 2]
+      (if (<= where-at end-point)
+        (let [next-up (inc where-at)]
+          (if (and (= 0 (mod greatest where-at)) (= 0 (mod least where-at)))
+            (recur where-at next-up)
+            (recur res next-up)))
+        res))))
+
+(defn gcd [a b]
+  (fn [a b]
+    (if (zero? b)
+      a
+      (recur b (mod a b)))))
+
+(defn gcd [a b]
+  (->> (map (fn [x]
+              (filter #(zero? (mod x %)) (range 1 (inc x))))
+            [a b])
+       (map set)
+       (apply clojure.set/intersection)
+       (apply max)))
+
 ;;
 ;; from-world and to-world are maps of type {:min _ :max _}
 ;; These max and min are inclusive, so the exact middle when :min 0 and :max 10 is 5
@@ -81,32 +108,38 @@
   (map #(Integer/parseInt %)
        (clojure.string/split string #" ")))
 
-(defn many-line-reader [lines item-fn]
-  (let [output (reduce
+(defn many-line-reader [lines item-fn no-overall-header]
+  (let [seed {:expecting (if no-overall-header :case-header :overall-header)
+              :results   []}
+        output (reduce
                  (fn [acc ele]
                    (let [nxt-acc (case (:expecting acc)
                                    :overall-header
                                    (assoc acc :expecting :case-header)
-
                                    :case-header
                                    (-> acc
                                        (assoc :current-header ele)
                                        (assoc :expecting :item))
-
                                    :item
                                    (let [res (item-fn ele (:current-header acc))]
                                      (-> acc
                                          (update :results conj res)
                                          (assoc :expecting :case-header)))
-
-                                   acc
-                                   )]
+                                   acc)]
                      nxt-acc))
-                 {:current-header nil
-                  :expecting :overall-header
-                  :results []}
+                 seed
                  lines)
         res (:results output)]
     res))
+
+(defn fibonacci-seq [size]
+  (loop [acc [1 1]
+         ele-at 2]
+    (if (= ele-at size)
+      acc
+      (let [prior-val (nth acc (dec ele-at))
+            prior-prior-val (nth acc (- ele-at 2))
+            next-val (+ prior-val prior-prior-val)]
+        (recur (conj acc next-val) (inc ele-at))))))
 
 
