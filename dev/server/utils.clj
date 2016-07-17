@@ -81,4 +81,32 @@
   (map #(Integer/parseInt %)
        (clojure.string/split string #" ")))
 
+(defn many-line-reader [lines item-fn]
+  (let [output (reduce
+                 (fn [acc ele]
+                   (let [nxt-acc (case (:expecting acc)
+                                   :overall-header
+                                   (assoc acc :expecting :case-header)
+
+                                   :case-header
+                                   (-> acc
+                                       (assoc :current-header ele)
+                                       (assoc :expecting :item))
+
+                                   :item
+                                   (let [res (item-fn ele (:current-header acc))]
+                                     (-> acc
+                                         (update :results conj res)
+                                         (assoc :expecting :case-header)))
+
+                                   acc
+                                   )]
+                     nxt-acc))
+                 {:current-header nil
+                  :expecting :overall-header
+                  :results []}
+                 lines)
+        res (:results output)]
+    res))
+
 
