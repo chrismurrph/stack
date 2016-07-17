@@ -847,10 +847,10 @@
         lines (line-seq (java.io.BufferedReader. *in*))
         valid-bst? (fn [ints]
                      (reduce
-                       (fn [{:keys [parent current failure] :as acc} ele]
-                         (let [parents-left (:l parent)
-                               currents-left (:l current)
-                               currents-right (:r current)
+                       (fn [{:keys [root failure] :as acc} ele]
+                         (let [current nil
+                               currents-left (-> current :l :val)
+                               currents-right (-> current :r :val)
                                currents-val (:val current)
                                ;_ (println "parent: " parent)
                                ;_ (println "current: " current)
@@ -860,7 +860,7 @@
                              (= failure :failed) acc
 
                              (nil? currents-val)
-                             (assoc-in acc [:current :val] ele)
+                             (assoc acc :root {:val ele})
 
                              (nil? currents-left)
                              (-> acc
@@ -880,7 +880,7 @@
                                      (assoc :parent current)
                                      (assoc :current {:val currents-right}))))
                              )))
-                       {:parent nil :current nil :failure :succeded}
+                       {:root nil :failure :succeded}
                        ints))
         f (fn [line hdr]
             (let [ints (str->ints line)
