@@ -1,7 +1,7 @@
 (ns utils)
 
- (defn rm-punctuation [in-str]
-   (apply str (remove #{\.\?\!} in-str)))
+(defn rm-punctuation [in-str]
+  (apply str (remove #{\. \? \!} in-str)))
 
 (defn abs [val]
   (if (neg? val)
@@ -132,14 +132,57 @@
         res (:results output)]
     res))
 
-(defn fibonacci-seq [size]
-  (loop [acc [1 1]
-         ele-at 2]
-    (if (= ele-at size)
-      acc
-      (let [prior-val (nth acc (dec ele-at))
-            prior-prior-val (nth acc (- ele-at 2))
-            next-val (+ prior-val prior-prior-val)]
-        (recur (conj acc next-val) (inc ele-at))))))
+
+;(defn fibonacci-seq [size]
+;  (loop [acc [1N 1N]
+;         ele-at 2N]
+;    (if (= ele-at size)
+;      acc
+;      (let [prior-val (nth acc (dec ele-at))
+;            prior-prior-val (nth acc (- ele-at 2N))
+;            next-val (+' prior-val prior-prior-val)]
+;        (recur (conj acc next-val) (inc ele-at))))))
+
+(defn fibonacci-seq [limit] (mod (nth (map first
+                                           (iterate
+                                             (fn fib-step [[a b]] [b (+ a b)]) [0N 1])) limit)
+                                 100000007))
+
+;(defn- bubble-max-key [k coll]
+;  "Move a maximal element of coll according to fn k (which returns a number)
+;   to the front of coll."
+;  (let [max (apply max-key k coll)]
+;    (cons max (remove #(identical? max %) coll))))
+
+(defn intersection
+  [s1 s2]
+  (if (< (count s2) (count s1))
+    (recur s2 s1)
+    (reduce (fn [result item]
+              (if (contains? s2 item)
+                result
+                (disj result item)))
+            s1 s1)))
+
+(defn divisors [n]
+  (into #{} (mapcat #(when (zero? (rem n %)) [% (/ n %)])
+                    (range 1 (Math/ceil (Math/sqrt n))))))
+
+;(defn factorial [x]
+;  (loop [n x f 1N]
+;    (if (= n 1)
+;      f
+;      (recur (dec n) (* f n)))))
+
+(defn factorial [n]
+  (reduce * (range 1N (inc n))))
+
+(defn combinations [pop sz]
+  (/ (factorial pop) (* (factorial sz) (factorial (- pop sz)))))
+
+(defn permutations [pop sz]
+  (/ (factorial pop) (factorial (- pop sz))))
+
+
 
 
