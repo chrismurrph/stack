@@ -311,13 +311,6 @@
     (println area)
     ))
 
-(defn sum [term a next-term b]
-  (if (> a b)
-    0
-    (+
-      (term a)
-      (sum term (next-term a) next-term b))))
-
 (defn x []
   (letfn [(sum [term a next-term b]
             (if (> a b)
@@ -332,17 +325,20 @@
                                  #(* %1 (Math/pow x %2))
                                  multipliers
                                  powers))))
+          plus-dx (fn [dx]
+                    (fn [x]
+                      (+ x dx)))
           integral (fn [f a b dx]
-                     (defn +dx [x] (+ x dx))
-                     (*
-                       (sum f (+ a (/ dx 2)) +dx b)
-                       dx))
-          solve-flat (fn [multipliers powers a b]
+                     (let [+dx (plus-dx dx)]
+                       (*
+                         (sum f (+ a (/ dx 2)) +dx b)
+                         dx)))
+          solve-flat (fn [increment multipliers powers a b]
                        (integral
                          (build-fn multipliers powers)
                          a
                          b
-                         0.001))
+                         increment))
           str->ints (fn [string]
                       (map #(Integer/parseInt %)
                            (clojure.string/split string #" ")))
@@ -353,7 +349,7 @@
           third-row-ints (str->ints (nth input 2))
           a (first third-row-ints)
           b (second third-row-ints)
-          res (solve-flat as bs a b)
+          res (solve-flat 0.01 as bs a b)
           ]
       (println res))))
 
