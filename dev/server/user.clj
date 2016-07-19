@@ -1112,48 +1112,70 @@
             (let [
                   coll (sort > row-of-nums)
                   res (reduce
-                        (fn [acc ele]
-                          (if (= acc -1)
+                        (fn [{:keys [idx res] :as acc} ele]
+                          (if (= res -1)
                             acc
                             (let [powered (Math/pow ele power)
-                                  total-so-far (+ powered acc)
+                                  total-so-far (+ powered res)
                                   ]
                               (if (> total-so-far target-sum)
-                                -1
-                                total-so-far))))
-                        0
+                                (-> acc
+                                    (assoc :res -1)
+                                    (update :idx inc))
+                                (-> acc
+                                    (assoc :res total-so-far)
+                                    (update :idx inc))))))
+                        {:res 0 :idx 0}
                         coll)]
-              (int res)))
+              res))
+          (triage-down [power most-numerous-first target-sum example-idx]
+            (let [
+                  ;_ (println "count in triage-down " (count most-numerous-first))
+                  example (nth most-numerous-first example-idx)
+                  ;_ (println "in triage-down " example)
+                  {:keys [idx res]} (power-add target-sum power example)
+                  short-circuit (= res -1)
+                  ]
+              (if short-circuit
+                (let [too-big-numbers (take idx example)
+                      ;_ (println "removing " remove-these)
+                      ]
+                  (if (seq too-big-numbers)
+                    (let [first-part #(take (count too-big-numbers) %)]
+                      (triage-down power
+                                   (remove #(= (first-part %) too-big-numbers) most-numerous-first)
+                                   target-sum
+                                   example-idx))
+                    (triage-down power
+                                 most-numerous-first
+                                 target-sum
+                                 (dec example-idx))))
+                most-numerous-first)))
           (combinations [population sz]
             (cond
               (= sz 0) '(())
               (empty? population) '()
               :else (concat (map #(cons (first population) %) (combinations (rest population) (dec sz)))
                             (combinations (rest population) sz))))]
-    (let [
-          ;; Returns coll of coll of those that powered and summed add up to the target sum
-          ;; Accumulator only needs to be a place to put the results - just stick the ele in
-          ;; there if it satisfies the condition.
-          power-add-memoized (memoize power-add)
-          power-adder-decider (fn [power coll target-sum]
+    (let [power-adder-decider (fn [power coll target-sum]
                                 (reduce
                                   (fn [acc ele-row]
                                     (let [
                                           ;_ (println "reduce looking at " ele)
-                                          answer (power-add-memoized target-sum power ele-row)
-                                          ;_ (println "target, sum is " target-sum answer)
+                                          {:keys [idx res]} (power-add target-sum power ele-row)
+                                          ;_ (println "target, res is " target-sum res)
                                           ]
-                                      (if (= answer target-sum)
+                                      (if (= (int res) target-sum)
                                         (conj acc ele-row)
                                         acc)))
                                   []
                                   coll))
           ;input (line-seq (java.io.BufferedReader. *in*))
-          input ["100"                                     ;; target
-                 "2"]                                      ;; power
-          target (Integer/parseInt (first input))
+          input ["100"                                      ;; target
+                 "2"]                                       ;; power
+          target-sum (Integer/parseInt (first input))
           power (Integer/parseInt (second input))
-          up-to (Math/floor (Math/pow target (/ power)))
+          up-to (Math/floor (Math/pow target-sum (/ power)))
           raw-possibilities (range 1 (inc up-to))
           possibilities raw-possibilities
           ;_ (println "possibilities: " possibilities)
@@ -1161,9 +1183,13 @@
           ;_ (println "num holes (target of combinations): " max-holes-to-put-in)
           combos-fn (partial combinations possibilities)
           all-to-try (mapcat combos-fn (range 1 (inc max-holes-to-put-in)))
-          ;_ (println "all to try: " all-to-try)
-          power-adder-decider-memoized (memoize power-adder-decider)
-          ans (power-adder-decider-memoized power all-to-try target)
+          biggest-first-for-each (map #(sort > %) all-to-try)
+          most-numerous-first (reverse (sort-by count biggest-first-for-each))
+          ;_ (println "all to try: " most-numerous-first)
+          triaged (triage-down power most-numerous-first target-sum 0)
+          ;_ (println "triage: " triage)
+          ;_ (println "after triage: " (triage-action triage most-numerous-first))
+          ans (power-adder-decider power triaged target-sum)
           ]
       ;(println "answers: " ans)
       (println (count ans)))))
