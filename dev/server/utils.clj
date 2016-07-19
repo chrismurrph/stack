@@ -1,5 +1,8 @@
 (ns utils)
 
+(defn u []
+  (require 'utils :reload))
+
 (defn rm-punctuation [in-str]
   (apply str (remove #{\. \? \!} in-str)))
 
@@ -18,6 +21,9 @@
 
 (defn exp [x pow-of]
   (Math/pow x pow-of))
+
+(defn root [x root-of]
+  (Math/pow x (/ root-of)))
 
 (defn round [precision d]
   (let [factor (Math/pow 10 precision)]
@@ -177,11 +183,37 @@
 (defn factorial [n]
   (reduce * (range 1N (inc n))))
 
-(defn combinations [pop sz]
+(defn combinations-count [pop sz]
   (/ (factorial pop) (* (factorial sz) (factorial (- pop sz)))))
 
-(defn permutations [pop sz]
+(defn permutations-count [pop sz]
   (/ (factorial pop) (factorial (- pop sz))))
+
+(comment
+  "Exactly same as one below yet still doesn't work!!"
+  (defn combinations [population sz]
+    (cond
+      (empty? population)
+      '()
+
+      (zero? sz)
+      '(())
+
+      :default
+      (let [
+            ;rest-of-combinations (combinations (rest population) (dec sz))
+            ;now-multiplied-with-first (mapv #(conj % (first population)) (combinations (rest population) (dec sz)))
+            ;really-rest (combinations (rest population) sz)
+            ]
+        (concat (map #(cons (first population) %) (combinations (rest population) (dec sz)))
+                (combinations (rest population) sz))))))
+
+(defn combinations [population sz]
+  (cond
+    (= sz 0) '(())
+    (empty? population) '()
+    :else (concat (map #(cons (first population) %) (combinations (rest population) (dec sz)))
+                  (combinations (rest population) sz))))
 
 
 

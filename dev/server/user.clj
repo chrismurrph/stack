@@ -1106,3 +1106,51 @@
     (doseq [v results]
       (println (str v))
       )))
+
+(defn x []
+  (letfn [(power-add [power coll]
+            (let [powered-coll (map #(Math/pow % power) coll)
+                  summed (reduce + powered-coll)]
+              (int summed)))
+          (combinations [population sz]
+            (cond
+              (= sz 0) '(())
+              (empty? population) '()
+              :else (concat (map #(cons (first population) %) (combinations (rest population) (dec sz)))
+                            (combinations (rest population) sz))))]
+    (let [
+          ;; Returns coll of coll of those that powered and summed add up to the target sum
+          ;; Accumulator only needs to be a place to put the results - just stick the ele in
+          ;; there if it satisfies the condition.
+          power-add-memoized (memoize power-add)
+          power-adder-decider (fn [power coll target-sum]
+                                (reduce
+                                  (fn [acc ele]
+                                    (let [
+                                          ;_ (println "reduce looking at " ele)
+                                          answer (power-add-memoized power ele)
+                                          ;_ (println "target, sum is " target-sum answer)
+                                          ]
+                                      (if (= answer target-sum)
+                                        (conj acc ele)
+                                        acc)))
+                                  []
+                                  coll))
+          power-adder-decider-memoized (memoize power-adder-decider)
+          ;input (line-seq (java.io.BufferedReader. *in*))
+          input ["100"
+                 "3"]
+          x (Integer/parseInt (first input))
+          n (Integer/parseInt (second input))
+          up-to (Math/floor (Math/pow x (/ n)))
+          possibilities (range 1 (inc up-to))
+          max-holes-to-put-in (count possibilities)
+          combos-fn (partial combinations possibilities)
+          all-to-try (mapcat combos-fn (range 1 (inc max-holes-to-put-in)))
+          ans (power-adder-decider-memoized n all-to-try x)
+          ]
+      (println "possibilities: " possibilities)
+      (println "all to try: " all-to-try)
+      (println "num holes (target of combinations): " max-holes-to-put-in)
+      (println "answers: " ans)
+      (println (count ans)))))
