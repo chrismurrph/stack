@@ -1171,25 +1171,27 @@
                                   []
                                   coll))
           ;input (line-seq (java.io.BufferedReader. *in*))
-          input ["100"                                      ;; target
+          input ["350"                                      ;; target
                  "2"]                                       ;; power
           target-sum (Integer/parseInt (first input))
           power (Integer/parseInt (second input))
           up-to (Math/floor (Math/pow target-sum (/ power)))
           raw-possibilities (range 1 (inc up-to))
           possibilities raw-possibilities
-          ;_ (println "possibilities: " possibilities)
+          _ (println "possibilities: " (count possibilities))
           max-holes-to-put-in (count raw-possibilities)
-          ;_ (println "num holes (target of combinations): " max-holes-to-put-in)
+          _ (println "num holes (target of combinations): " max-holes-to-put-in)
           combos-fn (partial combinations possibilities)
           all-to-try (mapcat combos-fn (range 1 (inc max-holes-to-put-in)))
+          _ (println "HERE")
           biggest-first-for-each (map #(sort > %) all-to-try)
+          _ (println "HERE")
           most-numerous-first (reverse (sort-by count biggest-first-for-each))
-          ;_ (println "all to try: " most-numerous-first)
-          triaged (triage-down power most-numerous-first target-sum 0)
+          _ (println "all to try: " (count most-numerous-first))
+          triaged (time (triage-down power most-numerous-first target-sum 0))
           ;_ (println "triage: " triage)
           ;_ (println "after triage: " (triage-action triage most-numerous-first))
-          ans (power-adder-decider power triaged target-sum)
+          ans (time (power-adder-decider power triaged target-sum))
           ]
       ;(println "answers: " ans)
       (println (count ans)))))
