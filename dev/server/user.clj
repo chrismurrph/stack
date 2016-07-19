@@ -1108,10 +1108,22 @@
       )))
 
 (defn x []
-  (letfn [(power-add [power coll]
-            (let [powered-coll (map #(Math/pow % power) coll)
-                  summed (reduce + powered-coll)]
-              (int summed)))
+  (letfn [(power-add [target-sum power row-of-nums]
+            (let [
+                  coll (sort > row-of-nums)
+                  res (reduce
+                        (fn [acc ele]
+                          (if (= acc -1)
+                            acc
+                            (let [powered (Math/pow ele power)
+                                  total-so-far (+ powered acc)
+                                  ]
+                              (if (> total-so-far target-sum)
+                                -1
+                                total-so-far))))
+                        0
+                        coll)]
+              (int res)))
           (combinations [population sz]
             (cond
               (= sz 0) '(())
@@ -1125,32 +1137,33 @@
           power-add-memoized (memoize power-add)
           power-adder-decider (fn [power coll target-sum]
                                 (reduce
-                                  (fn [acc ele]
+                                  (fn [acc ele-row]
                                     (let [
                                           ;_ (println "reduce looking at " ele)
-                                          answer (power-add-memoized power ele)
+                                          answer (power-add-memoized target-sum power ele-row)
                                           ;_ (println "target, sum is " target-sum answer)
                                           ]
                                       (if (= answer target-sum)
-                                        (conj acc ele)
+                                        (conj acc ele-row)
                                         acc)))
                                   []
                                   coll))
-          power-adder-decider-memoized (memoize power-adder-decider)
           ;input (line-seq (java.io.BufferedReader. *in*))
-          input ["100"
-                 "3"]
-          x (Integer/parseInt (first input))
-          n (Integer/parseInt (second input))
-          up-to (Math/floor (Math/pow x (/ n)))
-          possibilities (range 1 (inc up-to))
-          max-holes-to-put-in (count possibilities)
+          input ["100"                                     ;; target
+                 "2"]                                      ;; power
+          target (Integer/parseInt (first input))
+          power (Integer/parseInt (second input))
+          up-to (Math/floor (Math/pow target (/ power)))
+          raw-possibilities (range 1 (inc up-to))
+          possibilities raw-possibilities
+          ;_ (println "possibilities: " possibilities)
+          max-holes-to-put-in (count raw-possibilities)
+          ;_ (println "num holes (target of combinations): " max-holes-to-put-in)
           combos-fn (partial combinations possibilities)
           all-to-try (mapcat combos-fn (range 1 (inc max-holes-to-put-in)))
-          ans (power-adder-decider-memoized n all-to-try x)
+          ;_ (println "all to try: " all-to-try)
+          power-adder-decider-memoized (memoize power-adder-decider)
+          ans (power-adder-decider-memoized power all-to-try target)
           ]
-      (println "possibilities: " possibilities)
-      (println "all to try: " all-to-try)
-      (println "num holes (target of combinations): " max-holes-to-put-in)
-      (println "answers: " ans)
+      ;(println "answers: " ans)
       (println (count ans)))))
