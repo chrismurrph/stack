@@ -1,7 +1,7 @@
-(ns user)
+(ns jumping-bunnies)
 
 (defn r []
-  (require 'user :reload))
+  (require 'jumping-bunnies :reload))
 
 (defn x []
   (letfn [(lcm [& numbers]

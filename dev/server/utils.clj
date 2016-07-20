@@ -38,18 +38,19 @@
 (defn factorial [n]
   (reduce * (range 1N (inc n))))
 
-(defn gcd [a b]
-  (let [greatest (max a b)
-        least (if (= greatest a) b a)
-        end-point (min (Math/floor (/ greatest 2)) least)]
-    (loop [res 1
-           where-at 2]
-      (if (<= where-at end-point)
-        (let [next-up (inc where-at)]
-          (if (and (= 0 (mod greatest where-at)) (= 0 (mod least where-at)))
-            (recur where-at next-up)
-            (recur res next-up)))
-        res))))
+(defn intersection
+  [s1 s2]
+  (if (< (count s2) (count s1))
+    (recur s2 s1)
+    (reduce (fn [result item]
+              (if (contains? s2 item)
+                result
+                (disj result item)))
+            s1 s1)))
+
+(defn divisors [n]
+  (into #{} (mapcat #(when (zero? (rem n %)) [% (/ n %)])
+                    (range 1 (Math/ceil (Math/sqrt n))))))
 
 (defn gcd [a b]
   (fn [a b]
@@ -57,13 +58,19 @@
       a
       (recur b (mod a b)))))
 
-(defn gcd [a b]
-  (->> (map (fn [x]
-              (filter #(zero? (mod x %)) (range 1 (inc x))))
-            [a b])
-       (map set)
-       (apply clojure.set/intersection)
-       (apply max)))
+(defn lcm [& numbers]
+  (let [gcd-fn (fn [a b] (if (zero? b)
+                        a
+                        (recur b (mod a b))))
+        lcm-inner (fn [num1 num2]
+                (let [multiplied (* num1 num2)
+                      gcd (gcd-fn num1 num2)
+                      res (/ multiplied gcd)]
+                  res))
+        [head & tail] numbers]
+    (if (nil? tail)
+      head
+      (lcm-inner head (apply lcm tail)))))
 
 ;;
 ;; from-world and to-world are maps of type {:min _ :max _}
@@ -163,20 +170,6 @@
 ;  (let [max (apply max-key k coll)]
 ;    (cons max (remove #(identical? max %) coll))))
 
-(defn intersection
-  [s1 s2]
-  (if (< (count s2) (count s1))
-    (recur s2 s1)
-    (reduce (fn [result item]
-              (if (contains? s2 item)
-                result
-                (disj result item)))
-            s1 s1)))
-
-(defn divisors [n]
-  (into #{} (mapcat #(when (zero? (rem n %)) [% (/ n %)])
-                    (range 1 (Math/ceil (Math/sqrt n))))))
-
 ;(defn factorial [x]
 ;  (loop [n x f 1N]
 ;    (if (= n 1)
@@ -214,6 +207,29 @@
     (empty? population) '()
     :else (concat (mapv #(cons (first population) %) (combinations (rest population) (dec sz)))
                   (combinations (rest population) sz))))
+
+(comment
+  (defn gcd [a b]
+    (let [greatest (max a b)
+          least (if (= greatest a) b a)
+          end-point (min (Math/floor (/ greatest 2)) least)]
+      (loop [res 1
+             where-at 2]
+        (if (<= where-at end-point)
+          (let [next-up (inc where-at)]
+            (if (and (= 0 (mod greatest where-at)) (= 0 (mod least where-at)))
+              (recur where-at next-up)
+              (recur res next-up)))
+          res)))))
+
+(comment
+  (defn gcd [a b]
+    (->> (map (fn [x]
+                (filter #(zero? (mod x %)) (range 1 (inc x))))
+              [a b])
+         (map set)
+         (apply clojure.set/intersection)
+         (apply max))))
 
 
 
