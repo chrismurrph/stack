@@ -35,6 +35,9 @@
         ]
     (round 0 res)))
 
+(defn factorial [n]
+  (reduce * (range 1N (inc n))))
+
 (defn gcd [a b]
   (let [greatest (max a b)
         least (if (= greatest a) b a)
@@ -180,9 +183,6 @@
 ;      f
 ;      (recur (dec n) (* f n)))))
 
-(defn factorial [n]
-  (reduce * (range 1N (inc n))))
-
 (defn combinations-count [pop sz]
   (/ (factorial pop) (* (factorial sz) (factorial (- pop sz)))))
 
@@ -212,7 +212,7 @@
   (cond
     (= sz 0) '(())
     (empty? population) '()
-    :else (concat (map #(cons (first population) %) (combinations (rest population) (dec sz)))
+    :else (concat (mapv #(cons (first population) %) (combinations (rest population) (dec sz)))
                   (combinations (rest population) sz))))
 
 
