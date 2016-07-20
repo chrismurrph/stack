@@ -1,8 +1,11 @@
-(ns user)
+(ns subset-sum)
 
 (defn r []
   (require 'user :reload))
 
+;;
+;; Test cases 0->3 are fine, but rest are wrong or timeouts
+;;
 (defn x []
   (let [subset-sum (fn [examining-line target-test-num]
                      (let [
