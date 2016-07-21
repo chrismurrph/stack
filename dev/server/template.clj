@@ -42,7 +42,7 @@
         results (map some-func numbers)
         ]
     (doseq [x results]
-      (println x))))
+      (println (str x)))))
 
 (defn many-nums-per-line-x []
   (let [some-nums-func (fn [nums]
