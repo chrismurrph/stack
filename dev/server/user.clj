@@ -3,37 +3,24 @@
 (defn r []
   (require 'user :reload))
 
-(comment
-  (if (> decimal-number doing-num)
-    (if (nil? remainder)
-      (let [div-res (quot decimal-number doing-num)
-            div-remain (rem decimal-number doing-num)]
-        (recur (rest current-lst) (conj acc div-res) div-remain))
-      (recur (rest current-lst) (conj acc (quot remainder doing-num)) remainder))
-    (recur (rest current-lst) acc remainder)))
-
 (defn decimal->base-converter [base starting-power]
   (letfn [(recursive-func [list target-number]
             (loop [current-lst list acc [] remainder nil]
               (if (seq current-lst)
                 (let [head (first current-lst)
-                      doing-num (Math/pow base head)]
-                  (if (> doing-num target-number)
+                      boundary-num (Math/pow base head)]
+                  (if (> boundary-num target-number)
                     ;; Keep going till we are inside a boundary
                     (recur (rest current-lst) acc remainder)
                     (if remainder
-                      (let [calc-res (quot remainder doing-num)
-                            calc-remain (rem remainder doing-num)]
-                        (when (> calc-res (dec base))
-                          (println "BAD" calc-res remainder))
+                      (let [calc-res (quot remainder boundary-num)
+                            calc-remain (rem remainder boundary-num)
+                            ]
                         (recur (rest current-lst) (conj acc calc-res) calc-remain))
-                      (let [div-res (quot target-number doing-num)
-                            div-remain (rem target-number doing-num)
-                            _ (println "doing" doing-num "down to" head "for" target-number)
-                            _ (when (> div-res (dec base))
-                                (println "BAD" div-res remainder))]
-                        (recur (rest current-lst) (vec (concat acc [div-res div-remain])) div-remain)))))
-                acc)))]
+                      (let [div-res (quot target-number boundary-num)
+                            div-remain (rem target-number boundary-num)]
+                        (recur (rest current-lst) (vec (conj acc div-res)) div-remain)))))
+                (conj acc remainder))))]
     (fn [decimal-number]
       (let [powers (reverse (range 1 (inc starting-power)))
             _ (println powers)
@@ -41,12 +28,6 @@
             _ (assert (> start-at decimal-number))
             res (recursive-func powers decimal-number)]
         res))))
-
-(defn digits->special-number [digits]
-  (reduce (fn [a b] (+ (* a 6) b)) 0 digits))
-
-(defn digits-fn [n]
-  (->> n str (map (comp read-string str))))
 
 (defn char-translator [n]
   (cond
