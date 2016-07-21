@@ -208,6 +208,9 @@
     :else (concat (mapv #(cons (first population) %) (combinations (rest population) (dec sz)))
                   (combinations (rest population) sz))))
 
+(defn digits->number [digits]
+  (reduce (fn [a b] (+ (* a 10) b)) 0 digits))
+
 (comment
   (defn gcd [a b]
     (let [greatest (max a b)
