@@ -4,29 +4,39 @@
   (require 'user :reload))
 
 (defn x []
-  (let [my-fib-seq (fn [limit]
-                     (loop [idx limit acc [0 1]]
-                       (let [lst (last acc)
-                             nxt-lst (nth acc (- (count acc) 2))]
-                         (if (pos? idx)
-                           (recur (dec idx) (conj acc (+ lst nxt-lst)))
-                           (last acc)))))
-        fibonacci-seq (fn [limit]
-                        (mod (nth (map first
-                                       (iterate
-                                         (fn fib-step [[a b]] [b (+ a b)]) [0N 1])) limit)
-                             100000007))
-        input (line-seq (java.io.BufferedReader. *in*))
-        input ["7"
-               "0"
-               "1"
-               "2"
-               "3"
-               "4"
-               "5"
-               "6"]
-        numbers (map #(Long/parseLong %) (rest input))
-        results (map my-fib-seq numbers)
-        ]
-    (doseq [x results]
-      (println (str x)))))
+  (let [second-highest (fn [nums]
+                         (let [highest (apply max nums)
+                               without-it (remove #{highest} nums)
+                               res (apply max without-it)]
+                           res))
+        sec-highest (fn [nums]
+                      (:second (reduce
+                                 (fn [{:keys [highest second] :as acc} ele]
+                                   (cond
+                                     (> ele highest)
+                                     (-> acc
+                                         (assoc :highest ele)
+                                         (assoc :second highest))
+
+                                     (> ele second)
+                                     (-> acc
+                                         (assoc :second ele))
+
+                                     :default acc)
+                                   )
+                                 {:highest 0
+                                  :second  0}
+                                 nums)))
+        str->ints (fn [string]
+                    (map #(Integer/parseInt %)
+                         (clojure.string/split string #" ")))
+        ;input (line-seq (java.io.BufferedReader. *in*))
+        input ["1"
+               "65 44 55 27"
+               "22 45 78 57"]
+        all-num-lists (map str->ints (drop 1 input))
+        results (map sec-highest all-num-lists)
+        _ (println results)]
+    (doseq [v results]
+      (println (str v))
+      )))
