@@ -1,6 +1,6 @@
 (ns utils)
 
-(defn u []
+(defn r []
   (require 'utils :reload))
 
 (defn rm-punctuation [in-str]

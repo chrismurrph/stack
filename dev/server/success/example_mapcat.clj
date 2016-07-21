@@ -1,7 +1,7 @@
-(ns user)
+(ns example-mapcat)
 
 (defn r []
-  (require 'user :reload))
+  (require 'example-mapcat :reload))
 
 (defn x []
   (let [many-line-reader (fn [lines item-fn no-overall-header]
@@ -37,7 +37,7 @@
                     )
         f (fn [line hdr]
             (let [hdr-str (clojure.string/split hdr #" ")
-                  _ (println hdr-str)
+                  ;_ (println hdr-str)
                   dup-by (Integer/parseInt (second hdr-str))]
               (some-func dup-by line (first (char-array (first hdr-str))))))
         lines ["1"
