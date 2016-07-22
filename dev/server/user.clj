@@ -54,23 +54,7 @@
       (println (str a " " b))
       )))
 
-(defn x-3 []
-  (let [some-nums-func (fn [nums]
-                         (reduce +' nums)
-                         )
-        str->ints (fn [string]
-                    (map #(Long/parseLong %)
-                         (clojure.string/split string #" ")))
-        ;input (line-seq (java.io.BufferedReader. *in*))
-        input ["5"
-               "1000000001 1000000002 1000000003 1000000004 1000000005"]
-        all-num-lists (map str->ints (drop 1 input))
-        results (map some-nums-func all-num-lists)]
-    (doseq [v results]
-      (println (str v))
-      )))
-
-(defn x []
+(defn x-4 []
   (let [abs (fn [val] (if (neg? val) (* -1 val) val))
         str->ints (fn [string]
                     (map #(Integer/parseInt %)
@@ -95,3 +79,30 @@
         res (abs (- primy secry))
         ]
     (println (str res))))
+
+(defn x []
+  (let [str->ints (fn [string]
+                    (map #(Integer/parseInt %)
+                         (clojure.string/split string #" ")))
+        ;input (line-seq (java.io.BufferedReader. *in*))
+        input ["6"
+               "-4 3 -9 0 4 1"]
+        line-of-numbers (first (map str->ints (rest input)))
+        ;_ (println line-of-numbers)
+        results (reduce (fn [{:keys [pos neg zero] :as acc} ele]
+                          (cond
+                            (pos? ele) (update acc :pos inc)
+                            (neg? ele) (update acc :neg inc)
+                            :default (update acc :zero inc)
+                            )
+                          )
+                        {:pos 0 :neg 0 :zero 0}
+                        line-of-numbers)
+        denominator (count line-of-numbers)
+        pos (float (/ (:pos results) denominator))
+        neg (float (/ (:neg results) denominator))
+        zero (float (/ (:zero results) denominator))
+        ]
+    (println pos)
+    (println neg)
+    (println zero)))
