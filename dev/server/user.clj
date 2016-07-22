@@ -3,55 +3,95 @@
 (defn r []
   (require 'user :reload))
 
-(defn decimal->base-converter [base starting-power]
-  (letfn [(recursive-func [list target-number]
-            (loop [current-lst list acc [] remainder nil]
-              (if (seq current-lst)
-                (let [head (first current-lst)
-                      boundary-num (Math/pow base head)]
-                  (if (> boundary-num target-number)
-                    ;; Keep going till we are inside a boundary
-                    (recur (rest current-lst) acc remainder)
-                    (if remainder
-                      (let [calc-res (quot remainder boundary-num)
-                            calc-remain (rem remainder boundary-num)
-                            ]
-                        (recur (rest current-lst) (conj acc calc-res) calc-remain))
-                      (let [div-res (quot target-number boundary-num)
-                            div-remain (rem target-number boundary-num)]
-                        (recur (rest current-lst) (vec (conj acc div-res)) div-remain)))))
-                (conj acc remainder))))]
-    (fn [decimal-number]
-      (let [powers (reverse (range 1 (inc starting-power)))
-            _ (println powers)
-            start-at (Math/pow base starting-power)
-            _ (assert (> start-at decimal-number))
-            res (recursive-func powers decimal-number)]
-        res))))
+(defn x-1 []
+  (let [common-prefix (fn [str1 str2]
+                        (loop [acc-idx 0]
+                          (let [min-len (min (count str1) (count str2))
+                                ;_ (println min-len acc-idx)
+                                ]
+                            (if (= min-len acc-idx)
+                              acc-idx
+                              (let [val-at-idx-1 (nth str1 acc-idx)
+                                    val-at-idx-2 (nth str2 acc-idx)]
+                                (if (= val-at-idx-1 val-at-idx-2)
+                                  (recur (inc acc-idx))
+                                  acc-idx))))))
+        space-out (fn [out] (str (count out) " " out))
+        ;[str1 str2] (line-seq (java.io.BufferedReader. *in*))
+        [str1 str2] ["kitkat" "kit"]
+        idx (common-prefix str1 str2)
+        in-common (subs str1 0 idx)
+        end-1 (subs str1 idx)
+        end-2 (subs str2 idx)
+        ]
+    (println (space-out in-common))
+    (println (space-out end-1))
+    (println (space-out end-2))))
 
-(defn char-translator [n]
-  (cond
-    (= n 0) 0
-    (= n 1) \a
-    (= n 2) \t
-    (= n 3) \l
-    (= n 4) \s
-    (= n 5) \i
-    (= n 6) \n
-    ))
+(defn x-2 []
+  (let [some-nums-func (fn [nums-a nums-b]
+                         (- nums-a nums-b)
+                         )
+        str->ints (fn [string]
+                    (map #(Integer/parseInt %)
+                         (clojure.string/split string #" ")))
+        ;input (line-seq (java.io.BufferedReader. *in*))
+        input ["5 6 7"
+               "3 6 10"]
+        [first second] (map str->ints input)
+        calc-results (map some-nums-func first second)
+        results (reduce (fn [[a b] ele]
+                          (cond
+                            (pos? ele) [(inc a) b]
+                            (neg? ele) [a (inc b)]
+                            :default [a b]
+                            )
+                          )
+                        [0 0]
+                        calc-results)
+        ]
+    (let [[a b] results]
+      (println (str a " " b))
+      )))
 
-(defn x-test []
-  (char-translator 0))
+(defn x-3 []
+  (let [some-nums-func (fn [nums]
+                         (reduce +' nums)
+                         )
+        str->ints (fn [string]
+                    (map #(Long/parseLong %)
+                         (clojure.string/split string #" ")))
+        ;input (line-seq (java.io.BufferedReader. *in*))
+        input ["5"
+               "1000000001 1000000002 1000000003 1000000004 1000000005"]
+        all-num-lists (map str->ints (drop 1 input))
+        results (map some-nums-func all-num-lists)]
+    (doseq [v results]
+      (println (str v))
+      )))
 
 (defn x []
-  (let [
-        ;large [7 7 9 2 8 7 5]
-        ;the-digits (digits->special-number large)
-        ;_ (println "S/be in base 7:" the-digits)
-        conv (decimal->base-converter 7 9)
-        res2 (conv 7792875)
-        _ (println res2)
-        res3 (map (comp char-translator int) res2)
+  (let [abs (fn [val] (if (neg? val) (* -1 val) val))
+        str->ints (fn [string]
+                    (map #(Integer/parseInt %)
+                         (clojure.string/split string #" ")))
+        primary-diag (fn [matrix]
+                       (reduce
+                         (fn [acc ele]
+                           (let [idx (count acc)]
+                             (conj acc (nth ele idx))))
+                         []
+                         matrix))
+        ;input (line-seq (java.io.BufferedReader. *in*))
+        input ["3"
+               "11 2 4"
+               "4 5 6"
+               "10 8 -12"]
+        all-num-lists (map str->ints (drop 1 input))
+        primy (reduce + (primary-diag all-num-lists))
+        ;_ (println primy)
+        secry (reduce + (primary-diag (map reverse all-num-lists)))
+        ;_ (println secry)
+        res (abs (- primy secry))
         ]
-    (->> res3 (apply str))
-    ))
+    (println (str res))))

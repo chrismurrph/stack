@@ -14,6 +14,14 @@
           (recur (rest current-lst) (conj acc (some-func head))))
         acc))))
 
+(defn simple-x []
+  (let [
+        ;input (line-seq (java.io.BufferedReader. *in*))
+        input ["abcdefpr" "abcpqr"]
+        ]
+    (doseq [x input]
+      (println x))))
+
 (defn one-float-per-line-x []
   (let [round (fn [precision d] (let [factor (Math/pow 10 precision)]
                                   (/ (Math/round (* d factor)) factor)))
