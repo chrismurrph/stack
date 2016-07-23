@@ -80,7 +80,7 @@
         ]
     (println (str res))))
 
-(defn x []
+(defn x-5 []
   (let [str->ints (fn [string]
                     (map #(Integer/parseInt %)
                          (clojure.string/split string #" ")))
@@ -106,3 +106,23 @@
     (println pos)
     (println neg)
     (println zero)))
+
+(defn x []
+  (let [
+        give-me (fn [n x] (apply str (repeat n x)))
+        ;input (line-seq (java.io.BufferedReader. *in*))
+        input ["6"]
+        num-in (Integer/parseInt (first input))
+        ;output [(give-me 5 "#")]
+        output (reduce
+                 (fn [acc ele]
+                   (let [num-spaces (- num-in ele)
+                         num-bricks ele
+                         ;_ (println num-spaces num-bricks)
+                         ]
+                     (conj acc (concat (give-me num-spaces " ") (give-me num-bricks "#")))))
+                 []
+                 (range 1 (inc num-in)))
+        ]
+    (doseq [x output]
+      (println (apply str x)))))
