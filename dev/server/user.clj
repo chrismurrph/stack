@@ -1,7 +1,9 @@
 (ns user
   (:require [clojure.set :as set]
             [clojure.string :as str]
-            [clojure.pprint :as pprint]))
+            [clojure.pprint :as pprint]
+            [clojure.stacktrace :refer [print-stack-trace]]
+            [clojure.math.combinatorics :as combo]))
 
 (defn r []
   (require 'user :reload))
@@ -488,3 +490,235 @@
 
 (defn x-36 []
   (longest-increasing-subseq [7 6 5 4]))
+
+;; Performance problems
+(defn power-set-1 [entry-set]
+  (let [list-of-sets-f #(for [s %]
+                          (for [e s]
+                            (disj s e)))]
+    (loop [res []
+           in [entry-set]]
+      (let [new-sets (mapcat identity (list-of-sets-f in))]
+        (if (some seq new-sets)
+          (recur (into res new-sets) new-sets)
+          (conj (set res) #{} entry-set))))))
+
+;; Again times out.
+(defn power-set-2 [entry-set]
+  (->> [entry-set]
+       (iterate (fn [xs]
+                  (mapcat identity (for [s xs]
+                                     (for [e s]
+                                       (disj s e))))))
+       (take-while #(some seq %))
+       (mapcat identity)
+       (into #{})
+       (#(conj % #{} entry-set))))
+
+(defn power-set-3 [entry-set]
+  (->> [entry-set]
+       (iterate (fn [xs]
+                  (mapcat identity
+                          (for [s xs]
+                            (combo/combinations s (-> s count dec))))))
+       (take-while #(some seq %))
+       (mapcat identity)
+       (map (partial into #{}))
+       (into #{})
+       (#(conj % #{} entry-set))))
+
+(defn power-set-4 [entry-set]
+  (->> [entry-set]
+       (iterate (fn [xs]
+                  (distinct (mapcat identity (for [s xs]
+                                               (for [e s]
+                                                 (let [eq? #(= % e)]
+                                                   (->> s
+                                                        (remove eq?)))))))))
+       (take-while #(some seq %))
+       (mapcat identity)
+       (map (partial into #{}))
+       (into #{})
+       (#(conj % #{} entry-set))))
+
+(defn power-set [entry-set]
+  (->> [entry-set]
+       (iterate (fn [xs]
+                  (distinct (mapcat identity (for [s xs]
+                                               (for [e s]
+                                                 (remove (partial = e) s)))))))
+       (take-while #(some seq %))
+       (mapcat identity)
+       (map (partial into #{}))
+       (into #{})
+       (#(conj % #{} entry-set))))
+
+(def examples [#{1 :a}
+               #{}
+               #{1 2 3}
+               (into #{} (range 10))])
+
+(defn x-37 []
+  (let [example (nth examples 2)
+        ;res (combo/combinations (into [] example) (-> example count dec))
+        res (power-set example)
+        ]
+    (println res)
+    (count res)))
+
+(defn equivalences-2 [f s]
+  (->> (group-by f s)
+       vals
+       (map set)
+       set))
+
+(defn x-38 []
+  (equivalences-2 #(* % %) #{-2 -1 0 1 2}))
+
+(defn keys-and-vals [xs]
+  (->> xs
+       (reduce (fn [acc ele]
+                 (if (keyword? ele)
+                   (conj acc ele [])
+                   (update-in acc [(-> acc count dec)] (fn [v] (conj v ele)))))
+               [])
+       (partition 2)
+       (map (fn [[k v]] [k v]))
+       (into {})))
+
+(defn x-39 []
+  (keys-and-vals [:a 1 2 3 :b :c 4]))
+
+(defn tic-tc-toe [v]
+  (let [all-same? #(-> % frequencies first second ((partial = 3)))
+        winner? (fn [v]
+                  (or
+                    (-> (map first v) all-same?)
+                    (-> (map second v) all-same?)
+                    (= v [[2 0] [1 1] [0 2]])
+                    (= v [[0 0] [1 1] [2 2]])))]
+    (->> v
+         (map-indexed (fn [row-num row] (map-indexed (fn [col-num val] [val [col-num row-num]]) row)))
+         (mapcat identity)
+         (group-by first)
+         (remove (fn [[k v]] (= k :e)))
+         (map (fn [[k v]] [k (mapv second v)]))
+         (map (fn [[k v]] [k (winner? v)]))
+         (some (fn [[k v]] (when v k))))))
+
+(defn x-40 []
+  (tic-tc-toe [[:e :x :e]
+               [:o :o :o]
+               [:x :e :x]]))
+
+(defn decimal->base [n b]
+  (let [headings (->> (iterate #(*' % b) b) (take 6) (#(conj % 1)) reverse)]
+    (->> (reduce (fn [{:keys [res current :as acc]} heading]
+                   (assoc acc :res (conj res (quot current heading)) :current (rem current heading)))
+                 {:current n :res []}
+                 headings)
+         :res
+         (drop-while zero?)
+         (#(if (seq %) % [0])))))
+
+(defn x-41 []
+  (let [n (rand-int 100000)]
+    (decimal->base n n)))
+
+(defn oscillating-iterate [v & fs]
+  (let [num-fs (count fs)]
+    (->> (iterate (fn [[idx res]]
+                    [(inc idx) ((nth fs (rem idx num-fs)) res)])
+                  [0 v])
+         (map second))))
+
+(defn x-42 []
+  (->> (oscillating-iterate 3.14 int double)
+       (take 3)))
+
+(defn pronounce-number [xs]
+  (->> xs
+       (partition-by identity)
+       (mapcat (fn [xs]
+                 [(count xs) (first xs)]))))
+
+(defn pronounce-numbers [xs]
+  (->> (iterate #(->> % (partition-by identity) (mapcat (juxt count first)))
+                xs)
+       (drop 1)))
+
+(defn x-43 []
+  (->> (pronounce-numbers [1])
+       (take 3)))
+
+(defn answer [f]
+  (fn [& args]
+    (loop [idx 0
+           f f]
+      (let [res (f (nth args idx))]
+        (if (fn? res)
+          (recur (inc idx) res)
+          res)))))
+
+(defn x-44 []
+  (= 10 (probe-on ((answer (fn [a]
+                             (fn [b]
+                               (fn [c]
+                                 (fn [d]
+                                   (+ a b c d))))))
+                    1 2 3 4))))
+
+(defn smallest-in-all [xs-of-xs]
+  (->> xs-of-xs
+       (map set)
+       (apply clojure.set/intersection)
+       (apply min)))
+
+(defn range-in-all [xs-of-xs]
+  (->> xs-of-xs
+       (map (juxt #(apply min %) #(apply max %)))))
+
+(defn one-co-temporal-hof [[min-1 max-1]]
+  (fn [[min-2 max-2]]
+    (and (>= max-1 min-2)
+         (<= min-2 max-1))))
+
+;;
+;; If at an index we get a match, then mark that as false (no need to go further)
+;; at that index.
+;;
+(defn all-co-temporal [grab-size xs-of-xs most-advanced]
+  (let [most-advanced-range ((juxt #(apply min %) #(apply max %)) most-advanced)
+        one-co-temporal-f (one-co-temporal-hof most-advanced-range)]
+    (loop [states (map-indexed (fn [idx v]
+                                 (into v [idx])) (repeat (count xs-of-xs) [nil true]))
+           idx 0]
+      (if (every? (comp not second) states)
+        states
+        (let [bs (->> xs-of-xs
+                      (map (partial drop (* idx grab-size)))
+                      (map (partial take grab-size))
+                      (map (juxt #(apply min %) #(apply max %)))
+                      (map (complement one-co-temporal-f)))
+              new-states (map (fn [b] [idx b]) bs)]
+          (recur new-states (inc idx)))))))
+
+;;
+;; Start off finding the most advanced batch in a grab of 10 from each.
+;; Then have a fn that rets true if need to go further to get to the advanced batch.
+;; Have go loop retains an index for them all. [idx true/false], where true means need to
+;; read the next index. So at beginning at least one will be [0 false], and the rest [0 true].
+;; Stop looping when all are false.
+;; Answer will come from calling smallest-in-all when all are [0 false]
+;;
+(defn x-45 []
+  (let [in [[1 2 3 4 5 6 7] [0.5 3/2 4 5 19] [-4 0]]
+        grab-size 2
+        first-batches (map (partial take grab-size) in)
+        most-advanced (->> first-batches
+                           probe-on
+                           (reduce (fn [acc ele]
+                                     (if (> (last ele) (last acc))
+                                       ele
+                                       acc))))]
+    most-advanced))

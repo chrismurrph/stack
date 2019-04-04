@@ -7,6 +7,7 @@
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [com.taoensso/timbre "4.3.1"]
                  [org.clojure/tools.namespace "0.2.11"]
+                 [org.clojure/math.combinatorics "0.1.4"]
                  ]
   :main ^:skip-aot stack.core
   :target-path "target/%s"
