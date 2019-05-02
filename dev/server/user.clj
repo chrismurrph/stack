@@ -1287,176 +1287,6 @@
 (defn x-70 []
   (balanced-brackets-3 "This string has no brackets." #_"())" #_"[ { ] } "))
 
-(defn sequs-horribilis-1 [n xs accum-in]
-  (assert (number? accum-in))
-  (let [local-recur (fn [{:keys [head depth] :as node}]
-                      (assert (number? depth))
-                      (if (sequential? head)
-                        (do
-                          (println "head" head "accum" depth "first of head" (first head))
-                          (sequs-horribilis-1 n head depth))
-                        node))]
-    (loop [[head & tail] xs
-           res []
-           accum accum-in]
-      (assert (number? accum))
-      (let [node {:head head :depth (if (number? head)
-                                      (+ head accum)
-                                      accum)}]
-        (if tail
-          (recur tail (conj res (local-recur node)) (if (number? head)
-                                                      (+ head accum)
-                                                      accum))
-          (conj res (local-recur node)))))))
-
-(defn sequs-horribilis-2 [n xs depth-in]
-  (let [local-recur (fn [{:keys [head depth] :as node}]
-                      (if (sequential? head)
-                        (sequs-horribilis-2 n head (inc depth))
-                        node))]
-    (loop [[head & tail] xs
-           res []
-           depth depth-in]
-      (let [node {:head head :depth depth}]
-        (if tail
-          (recur tail (conj res (local-recur node)) depth)
-          (conj res (local-recur node)))))))
-
-(defn sequs-horribilis-3 [n-in xs-in]
-  (letfn [(sequs ([n xs depth-in]
-                  (let [local-recur (fn [{:keys [head depth] :as node}]
-                                      (if (sequential? head)
-                                        (sequs n head (inc depth))
-                                        node))]
-                    (loop [[head & tail] xs
-                           res []
-                           depth depth-in]
-                      (let [node {:head head :depth depth}]
-                        (if tail
-                          (recur tail (conj res (local-recur node)) depth)
-                          (conj res (local-recur node))))))))]
-    (->> (sequs n-in xs-in 0)
-         flatten
-         (cons {:depth 0})
-         (partition 2 1))))
-
-(defn sequs-horribilis-4 [n-in xs-in]
-  (letfn [(maybe-recur ([h d n]
-                        (if (sequential? h)
-                          (sequs n h (inc d))
-                          {:num h :depth d})))
-          (sequs ([n xs depth-in]
-                  (let []
-                    (loop [[h & t] xs
-                           res []
-                           depth depth-in]
-                      (if t
-                        (recur t (conj res (maybe-recur h depth n)) depth)
-                        (conj res (maybe-recur h depth n)))))))
-          (this-fn ([n xs]
-                     ;(println xs)
-                    (loop [[{:keys [num depth-diff] :as h} & t] xs
-                           accum 0
-                           res []]
-                      ;(println "num" num)
-                      (assert num xs)
-                      (let [new-accum (+ num accum)
-                            new-res (if (and depth-diff (pos? depth-diff))
-                                      (conj res (this-fn 0 [(assoc h :depth-diff 0)]))
-                                      (conj res h))]
-                        (if (<= new-accum n)
-                          (recur t
-                                 new-accum
-                                 new-res)
-                          new-res)))))]
-    (->> (sequs n-in xs-in 0)
-         flatten
-         (cons {:depth 0})
-         (partition 2 1)
-         (map (fn [[{depth-a :depth} {depth-b :depth num :num}]]
-                {:num num :depth-diff (- depth-b depth-a)}))
-         (this-fn n-in))))
-
-;; Next loop/recur with in, out, accum so can short circuit when have reached the right number
-;; Then partition by depth and reduce thru that
-(defn x-71 []
-  (->> (sequs-horribilis-4 10 [1 2 [3 [4 5] 6] 7])))
-
-(defn sequs-horribilis-5 [n-in xs-in]
-  (letfn [(maybe-recur ([h d n a]
-                        (if (sequential? h)
-                          (sequs n h (inc d) (+ a (if (sequential? h) 0 h)))
-                          {:num h :depth d :acc (+ a (if (sequential? h) 0 h))})))
-          (sequs ([n xs depth-in accum]
-                  (loop [[h & t] xs
-                         res []
-                         depth depth-in
-                         acc accum]
-                    (assert (number? acc))
-                    (if t
-                      (recur t
-                             (conj res
-                                   (maybe-recur h depth n acc))
-                             depth
-                             (+ acc (if (sequential? h) 0 h)))
-                      (conj res (maybe-recur h depth n acc))))))]
-    (->> (sequs n-in xs-in 0 0))))
-
-(defn x-72 []
-  (->> (sequs-horribilis-5 10 [1 2 [3 [4 5] 6] 7])))
-
-(defn x-73 []
-  (->> (flatten [1 2 [3 [4 5] 6] 7])
-       (reductions +)
-       (take-while #(<= % 10))
-       count))
-
-(defn sequs-horribilis-6 [n-in xs-in]
-  (let [out-count (->> (flatten xs-in)
-                       (reductions +)
-                       (take-while #(< % n-in))
-                       count)]
-    (letfn [(maybe-recur ([h n idx]
-                          (if (sequential? h)
-                            (sequs n h idx)
-                            (if (<= idx out-count)
-                              h
-                              nil))))
-            (sequs ([n xs idx]
-                    (loop [[h & t] xs
-                           res []
-                           idx idx]
-                      (let [maybe-res (maybe-recur h n idx)]
-                        (if (nil? maybe-res)
-                          res
-                          (if (nil? t)
-                            (conj res maybe-res)
-                            (recur t
-                                   (conj res
-                                         maybe-res)
-                                   (inc idx))))))))]
-      (->> (sequs n-in xs-in 0)))))
-
-(defn x-74 []
-  (->> (sequs-horribilis-6 10 [1 2 [3 [4 5] 6] 7])))
-
-(defn sequs-horribilis-7 [upper xs]
-  (let [cost (fn [ele]
-               (if (sequential? ele)
-                 (apply + (flatten ele))
-                 ele))
-        fit (fn [n c]
-              (if (sequential? n)
-                (sequs-horribilis-7 c n)
-                (do
-                  (println "At" n "c is" c)
-                  (when (<= c n) c))))
-        allowances (reductions #(- %1 (cost %2)) upper xs)]
-    ;(println allowances)
-    (->> (map fit xs allowances)
-         (take-while #(or (number? %) (seq %)))
-         )))
-
 (defn prune-1 [n xs]
   (let [cost (fn [node] (if (sequential? node) (apply + (flatten node)) node))
         fit (fn [n node] (if (sequential? node) (prune-1 n node) (when (<= node n) node)))
@@ -1465,18 +1295,15 @@
     (println "allowances" allowances)
     (take-while #(or (number? %) (seq %)) pruned)))
 
-(defn x-75 []
-  (->> (sequs-horribilis-7 10 [1 2 [3 [4 5] 6] 7])))
-
-(defn x-76 []
+(defn x-71 []
   (->> '(1 2 (3 (4 nil) nil) nil)
        (take-while #(or (number? %) (seq %)))))
 
-(defn x-77 []
+(defn x-72 []
   (seq [4 nil 5]))
 
 ;; (1 2 (3 (4 (5 (6 (7))))))
-(defn x-78 []
+(defn x-73 []
   (prune-1 30 [1 2 [3 [4 [5 [6 [7 8]] 9]] 10] 11]))
 
 ;;
@@ -1490,5 +1317,5 @@
                 (when (>= a 0) x)) allowances xs)
          (take-while number?))))
 
-(defn x-79 []
+(defn x-74 []
   (prune-2 5 [1 2 3 4 5]))
