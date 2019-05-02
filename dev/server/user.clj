@@ -712,7 +712,7 @@
 ;; Answer will come from calling smallest-in-all when all are [0 false]
 ;;
 (defn x-45 []
-  (let [in [[1 2 3 4 5 6 7] [0.5 3/2 4 5 19] [-4 0]]
+  (let [in [[1 2 3 4 5 6 7] [0.5 3/2 4 5 19] [-4 0 1 2 3 4]]
         grab-size 2
         first-batches (map (partial take grab-size) in)
         most-advanced (->> first-batches
@@ -722,3 +722,773 @@
                                        ele
                                        acc))))]
     most-advanced))
+
+(defn smallest-in-all-1 [& lazy-seqs]
+  (let [curr-val-f (fn [lazy-indexes which-lazy]
+                     (let [curr-idx (nth lazy-indexes which-lazy)
+                           curr-lazy (nth lazy-seqs which-lazy)]
+                       (nth curr-lazy curr-idx)))
+        prior-index-f (fn [n curr-lazy]
+                        (if (pos? curr-lazy)
+                          (- curr-lazy n)
+                          (- (count lazy-seqs) n)))
+        prior-val-f (fn [n lazy-indexes which-lazy]
+                      (try (nth (nth lazy-seqs (prior-index-f n which-lazy)) (nth lazy-indexes (prior-index-f n which-lazy)))
+                           (catch Exception _ nil)))
+        prev-val-f (partial prior-val-f 1)
+        ;; If are lower than current value in last sequence then move index forward so are just greater than it.
+        move-forward-hof (fn [which-lazy lazy-indexes]
+                           (fn [n]
+                             (let [prev-val (prev-val-f lazy-indexes which-lazy)
+                                   this-lazy (nth lazy-seqs which-lazy)]
+                               (loop [num-incs 0
+                                      idx n]
+                                 (println "idx has become" idx "on" this-lazy)
+                                 (if (<= (nth this-lazy idx) prev-val)
+                                   (if (= (inc idx) (count this-lazy))
+                                     (do
+                                       (println "reached end")
+                                       num-incs)
+                                     (if (= (nth this-lazy idx) prev-val)
+                                       (do
+                                         (println "equal values")
+                                         num-incs)
+                                       (recur (inc num-incs) (inc idx))))
+                                   (do
+                                     (println "prev value is less")
+                                     0))))))]
+    (loop [which-lazy 0
+           lazy-indexes (vec (take (count lazy-seqs) (repeat 0)))
+           times 0]
+      (when (< times 15)
+        (let [how-many (count lazy-seqs)
+              curr-val (curr-val-f lazy-indexes which-lazy)
+              last-val (prev-val-f lazy-indexes which-lazy)
+              move-forward-f (move-forward-hof which-lazy lazy-indexes)]
+          (println "last" last-val "curr" curr-val)
+          (if (= last-val curr-val)
+            (if (let [buffer (mapv #(nth %2 (nth lazy-indexes %1)) (range how-many) lazy-seqs)]
+                  (println "buffer" buffer)
+                  (every? (partial = curr-val) buffer))
+              curr-val
+              (recur (rem (inc which-lazy) how-many) lazy-indexes (inc times)))
+            (recur (rem (inc which-lazy) how-many) (vec (update-in lazy-indexes [which-lazy] move-forward-f)) (inc times))))))))
+
+;;
+;; Have buffer holds one spot for each
+;; Read until goes equal or over last one
+;; If equal see if the whole buffer is =, and we are done
+;; If not store one over equal.
+;; Loop has index and buffer and access to the infinite-s
+;;
+(defn x-50 []
+  (smallest-in-all-1 [1 2 3 4 5 6 7] [0.5 3/2 4 19]))
+
+(defn smallest-in-all-2 [& xss]
+  (let [firsts (map first xss)]
+    (if (every? (partial = (first firsts)) firsts)
+      (first firsts)
+      (recur (for [xs xss]
+               (drop-while #(< % (apply max firsts)) xs))))))
+
+;;
+;; Look at first spot and if all equal that's the answer
+;; Otherwise find greatest and drop while < it.
+;; So here 2 is greatest:
+;; [1 2 3 4 5 6 7] [0.5 3/2 4 19] [2 3.5 4 7]
+;; Becomes:
+;; [2 3 4 5 6 7] [4 19] [3.5 4 7]
+;; Now 4 is greatest so becomes:
+;; [4 5 6 7] [4 19] [4 7]
+;; Now all are equal so that's the answer
+;;
+;;
+;;
+(defn x-51 []
+  (smallest-in-all-2 [1 2 3 4 5 6 7] [0.5 3/2 4 19] [3.5 4 7]))
+
+(defn partially-flatten-1 [xss]
+  (for [xs xss]
+    (loop [xs xs]
+      (if (and (sequential? xs) (sequential? (first xs)))
+        (recur (apply concat xs))
+        xs))))
+
+(defn partially-flatten-2 [xss]
+  (let [res (atom [])]
+    (clojure.walk/postwalk (fn [x]
+                             (when (and (sequential? x) (sequential? (first x)))
+                               (swap! res concat x))) xss)
+    @res))
+
+;;
+;; Must involve selective recursion on many. So perhaps recursion in the mapping function.
+;;
+(defn partially-flatten-3 [xs]
+  (let [sequent? (every-pred (complement string?) sequential?)
+        separate (juxt filter remove)
+        go-deeper? (fn [x] (let [res (and (sequent? x) (some sequent? x))]
+                             ;(println "[go-deeper? <" x "><" res ">]")
+                             res))
+        desired-node? (fn [x]
+                        (let [res (and (sequent? x) (every? #(not (sequent? %)) x))]
+                          ;(println "[desired-node? <" x "><" res ">]")
+                          res))]
+    (->> (loop [xs xs
+                res []
+                depth 0]
+           (cond
+             (desired-node? xs)
+             (into [[depth]] (into [xs] res))
+
+             (go-deeper? xs)
+             (if (every? desired-node? xs)
+               (into [[depth]] (into res xs))
+               (let [[deepers rets] (separate (some-fn desired-node? go-deeper?) xs)]
+                 ;(println "rets" rets)
+                 ;(println "type" (type res))
+                 (recur
+                   (apply concat deepers)
+                   (into [[depth]] (into res [rets]))
+                   (inc depth))))
+             ))
+         (filter seq)
+         )))
+
+;;
+;; Must involve selective recursion on many. So perhaps recursion in the mapping function.
+;;
+(defn partially-flatten-3 [xs]
+  (let [sequent? (every-pred (complement string?) sequential?)
+        separate (juxt filter remove)
+        go-deeper? #(and (sequent? %) (some sequent? %))
+        desired-node? #(and (sequent? %) (every? (complement sequent?) %))]
+    (->> (loop [xs xs res []]
+           (cond
+             (desired-node? xs) (into [xs] res)
+             (go-deeper? xs) (if (every? desired-node? xs)
+                               (into xs res)
+                               (let [[deepers rets] (separate (some-fn desired-node? go-deeper?) xs)]
+                                 (recur
+                                   (apply concat deepers)
+                                   (into [rets] res))))))
+         (filter seq))))
+
+(defn partially-flatten-4 [xs]
+  (if (every? sequential? xs)
+    (mapcat partially-flatten-4 xs)
+    [xs]))
+
+;; Want
+;; '((1 2)(3 4)(5 6))
+(defn x-52 []
+  [(partially-flatten-3 '((1 2) ((3 4) ((((5 6)))))))
+   (partially-flatten-3 [[1 2] [[3 4] [[[[5 6]]]]]])
+   (partially-flatten-3 [["Do"] ["Nothing"]])
+   (partially-flatten-3 [[[[:a :b]]] [[:c :d]] [:e :f]])])
+
+;; Want
+;; '((1 2)(3 4)(5 6))
+(defn x-55 []
+  [(partially-flatten-4 '((1 2) ((3 4) ((((5 6)))))))
+   (partially-flatten-4 [[1 2] [[3 4] [[[[5 6]]]]]])
+   (partially-flatten-4 [["Do"] ["Nothing"]])
+   (partially-flatten-4 [[[[:a :b]]] [[:c :d]] [:e :f]])])
+
+(defn global-take-while [n p xs]
+  (loop [curr xs
+         res '()
+         matched-count 0]
+    (let [satisfies (take-while p curr)
+          new-matched-count (if (seq satisfies)
+                              (+ matched-count (count satisfies))
+                              matched-count)]
+      (if (< new-matched-count n)
+        (recur (drop (max 1 (count satisfies)) curr)
+               (concat res satisfies)
+               new-matched-count)
+        (take-while #(not= % (last satisfies)) xs)))))
+
+(defn x-53 []
+  (global-take-while 4 #(= 2 (mod % 3))
+                     [2 3 5 7 11 13 17 19 23])
+  #_(global-take-while 3 #(some #{\i} %) ["this" "is" "a" "sentence" "i" "wrote"])
+  )
+
+(defn roman->decimal [s]
+  (->> s
+       (partition-by identity)
+       (mapv (juxt #(-> % first {\I 1 \V 5 \X 10 \L 50 \C 100 \D 500 \M 1000})
+                   count))
+       (#(into % [[]]))
+       (partition 2 1)
+       (reduce (fn [acc [[decimal-value size] [following-value _]]]
+                 ((if (> (or following-value 0) decimal-value) - +)
+                   acc
+                   (* decimal-value size)))
+               0)))
+
+(defn x-54 []
+  (map roman->decimal ["XIV"
+                       "DCCCXXVII"
+                       "MMMCMXCIX"
+                       "XLVIII"]))
+
+;; Given one, returns two
+(defn extender-hof [triangle]
+  (fn [row-idx]
+    (let [this-row-count (inc row-idx) #_(count (nth triangle row-idx))
+          next-row (nth triangle (inc row-idx))]
+      (map (fn [idx]
+             [(nth next-row idx) (nth next-row (inc idx))])
+           (range this-row-count)))))
+
+;; Given the number of rows in a triangle s/be able to work out the possible routes
+;;
+
+(defn x-56 []
+  (let [tri [[1]
+             [2 4]
+             [5 1 4]
+             [2 3 4 5]]]
+    ((extender-hof tri) 2)))
+
+;;
+;; co-ordinates are [col row] with [0 0] at the top.
+;; Here [[0 0]] will return [[[0 0] [0 1]][[0 0] [1 1]]]
+;; We take the last co-ordinate of the path and use it to create two new paths
+;;
+(defn one->two-extender [path]
+  (let [[end-col end-row] (last path)
+        lower-left-ending [end-col (inc end-row)]
+        lower-right-ending [(inc end-col) (inc end-row)]]
+    [(into path [lower-left-ending]) (into path [lower-right-ending])]))
+
+(defn co-ord->value-hof [tri]
+  (fn [[col row]]
+    (get-in tri [row col])))
+
+(defn x-57 []
+  (let [co-ord->value (co-ord->value-hof [[1]
+                                          [2 4]
+                                          [5 1 4]
+                                          [2 3 4 5]])]
+    (let [res (first (one->two-extender [[0 0] [0 1]]))]
+      (map co-ord->value res))))
+
+(defn iteratee [paths]
+  (mapcat one->two-extender paths))
+
+(defn min-path [tri]
+  (let [tri (into [] tri)
+        co-ord->value ((fn [tri]
+                         (fn [[col row]]
+                           (get-in tri [row col]))) tri)
+        one->two-extender (fn [path]
+                            (let [[end-col end-row] (last path)
+                                  lower-left-ending [end-col (inc end-row)]
+                                  lower-right-ending [(inc end-col) (inc end-row)]]
+                              [(into path [lower-left-ending]) (into path [lower-right-ending])]))
+        iteratee (fn [paths] (mapcat one->two-extender paths))]
+    (->> (iterate iteratee [[[0 0]]])
+         (take (count tri))
+         last
+         (map (fn [co-ords] (map co-ord->value co-ords)))
+         (map (partial apply +))
+         (apply min))))
+
+(defn x-58 []
+  (min-path '([1]
+               [2 4]
+               [5 1 4]
+               [2 3 4 5])))
+
+(defn prime? [n]
+  (not-any? #(zero? (rem n %)) (range 2 n)))
+
+(defn primes [n]
+  (->> (iterate inc 2)
+       (filter prime?)
+       (take n)))
+
+(defn prime-sandwich [n]
+  (let [[a b c] (->> (iterate inc 2)
+                     (filter (fn [n] (not-any? #(zero? (rem n %)) (range 2 n))))
+                     (partition 3 1)
+                     (drop-while (fn [[_ b _]] (< b n)))
+                     first)]
+    (and (= b n) (= (/ (+ a c) 2) b))))
+
+(defn x-59 []
+  (prime-sandwich 4))
+
+(defn combinations [sz population]
+  (->> (cond
+         (= sz 0) '(())
+         (empty? population) '()
+         :else (concat (mapv #(cons (first population) %) (combinations (dec sz) (rest population)))
+                       (combinations sz (rest population))))
+       (map set)
+       (into #{})))
+
+(defn x-60 []
+  (->> (combinations 2 #{0 1 2})))
+
+(defn make-interval [{:keys [rest intervals]}]
+  (let [interval (->> (cons (-> rest first dec) rest)
+                      (partition 2 1)
+                      (take-while (fn [[a b]]
+                                    (= 1 (- b a))))
+                      (map second))
+        ending (last interval)]
+    {:intervals (into intervals [[(first interval) ending]])
+     :rest      (->> rest
+                     (drop-while #(>= ending %)))}))
+
+(defn intervals [xs]
+  (let [make-interval (fn [{:keys [rest intervals]}]
+                        (let [interval (->> (cons (-> rest first dec) rest)
+                                            (partition 2 1)
+                                            (take-while (fn [[a b]]
+                                                          (= 1 (- b a))))
+                                            (map second))
+                              ending (last interval)]
+                          {:intervals (into intervals [[(first interval) ending]])
+                           :rest      (->> rest
+                                           (drop-while #(>= ending %)))}))]
+    (if (seq xs)
+      (->> (iterate make-interval {:rest      (sort (set xs))
+                                   :intervals []})
+           (drop 1)
+           (drop-while #(-> % :rest seq))
+           first
+           :intervals)
+      [])))
+
+(defn x-61 []
+  #_(make-interval {:rest      (sort [10 9 8 1 2 3])
+                    :intervals []})
+  (intervals []))
+
+(def cmds {'+ +
+           '/ /
+           '* *
+           '- -})
+
+(defn uce-1 [f]
+  (let [op (first f)
+        operands (rest f)]
+    (fn [m]
+      (apply (cmds op) (map #(if (number? %) % (m %)) operands)))))
+
+(defn partially-flatten-4 [xs]
+  (if (every? sequential? xs)
+    (mapcat partially-flatten-4 xs)
+    [xs]))
+
+(defn uce-2 [m]
+  (fn calc [f]
+    (let [op (first f)
+          operands (map #(if (sequential? %)
+                           (calc %)
+                           %) (rest f))]
+      (apply (cmds op) (map #(if (number? %) % (m %)) operands)))))
+
+(defn uce-3 [f]
+  (let [cmds {'+ +
+              '/ /
+              '* *
+              '- -}]
+    (fn [m]
+      (let [op (first f)
+            operands (map #(if (sequential? %)
+                             ((uce-3 %) m)
+                             %)
+                          (rest f))]
+        (apply (cmds op) (map #(if (number? %) % (m %)) operands))))))
+
+(defn x-62 []
+  ((uce-2 '{b 8 a 16})
+    '(/ a b)))
+
+(defn x-63 []
+  ((uce-2 '{a 1 b 8})
+    '(* (+ 2 a)
+        (- 10 b))))
+
+(defn x-64 []
+  ((uce-3 '(* (+ 2 a)
+              (- 10 b)))
+    '{a 1 b 8}))
+
+(defn roman-denominations [n [denomination next-denomination]]
+  (let [res (when (or (nil? next-denomination) (< n next-denomination))
+              (let [res (quot n denomination)]
+                (if (< res 4)
+                  [[denomination res]]
+                  [[denomination (quot (- next-denomination (* res denomination)) denomination)] [next-denomination 1]])))]
+    ;(println n denomination next-denomination res)
+    res))
+
+(defn x-65 []
+  (roman-denominations 4 [1 5]))
+
+(def roman-numerals {1 \I 5 \V 10 \X 50 \L 100 \C 500 \D 1000 \M})
+
+;;
+;; No good b/c not catching say 9 being IX.
+;;
+(defn roman-numeral-1 [n]
+  (let [roman-numerals {1    \I
+                        5    \V
+                        10   \X
+                        50   \L
+                        100  \C
+                        500  \D
+                        1000 \M}
+        roman-denominations (fn [n [denomination next-denomination]]
+                              (when (or (nil? next-denomination) (< n next-denomination))
+                                (let [res (quot n denomination)]
+                                  (if (or (< res 4) #_(not= (rem denomination 10) 0))
+                                    [[denomination res]]
+                                    [[denomination (quot (- next-denomination (* res denomination)) denomination)] [next-denomination 1]]))))]
+    (->> (loop [[head & tail] [[1000 nil] [500 1000] [100 500] [50 100] [10 50] [5 10] [1 5]]
+                number-left n
+                result []]
+           (let [res (roman-denominations number-left head)
+                 res-count (if (= 1 (count res))
+                             (->> res first (apply *))
+                             (let [[[a b] [c d]] res]
+                               (- (* c d) (* a b))))
+                 new-left (when res (- number-left res-count))]
+             (cond
+               (nil? res) (recur tail number-left result)
+               (nil? tail) (into result res)
+               :else (recur tail new-left (into result res)))))
+         (filter #(-> % second pos?))
+         (map (fn [[a b]]
+                [(roman-numerals a) b]))
+         (map (fn [[a b]]
+                (apply str (repeat b a))))
+         (apply str))))
+
+;; CMXCIX
+(defn x-66 []
+  (roman-numeral-1 999))
+
+;; 9 s/be IX, getting VIV
+(defn x-67 []
+  (roman-numeral-1 9))
+
+(defn x-68 []
+  (roman-numeral-1 3549))
+
+(def ordered-bases [[1000 "M"]
+                    [900 "CM"]
+                    [500 "D"]
+                    [400 "CD"]
+                    [100 "C"]
+                    [90 "XC"]
+                    [50 "L"]
+                    [40 "XL"]
+                    [10 "X"]
+                    [9 "IX"]
+                    [5 "V"]
+                    [4 "IV"]
+                    [1 "I"]])
+
+;;
+;;
+;;
+(defn roman-numeral-2 [n]
+  (->> (loop [[[denomination symbol] & tail] [[1000 "M"] [900 "CM"] [500 "D"] [400 "CD"] [100 "C"] [90 "XC"] [50 "L"] [40 "XL"] [10 "X"] [9 "IX"] [5 "V"] [4 "IV"] [1 "I"]]
+              number-left n
+              result []]
+         (let [times (quot number-left denomination)
+               accum (into result [[denomination times symbol]])]
+           (if tail
+             (recur tail
+                    (- number-left (* denomination times))
+                    accum)
+             accum)))
+       (remove #(-> % second zero?))
+       (map (fn [[_ n sym]] (apply str (repeat n sym))))
+       (apply str)))
+
+(defn x-69 []
+  (roman-numeral-2 3549))
+
+(defn balanced-brackets-1 [s]
+  (let [closed? (fn [[depth position]]
+                  (zero? depth))
+        open? (fn [[depth position ch]]
+                (pos? depth))
+        closing-while-another-open? (fn [head currents]
+                                      (let [open-one (some #(when open? %) currents)]
+                                        (println currents)
+                                        (and (#{\) \} \]} head))))]
+    (loop [idx 0
+           [head & tail] s
+           [paren-depth paren-position :as paren] [0 nil]
+           [braces-depth braces-position :as braces] [0 nil]
+           [square-bracket-depth square-bracket-position :as square-bracket] [0 nil]]
+      (let [[new-paren new-braces new-square-bracket :as news]
+            (condp = head
+              \( [[(inc paren-depth) idx] braces square-bracket]
+              \{ [paren [(inc braces-depth) idx] square-bracket]
+              \[ [paren braces [(inc square-bracket-depth) idx]]
+              \) [[(dec paren-depth) idx] braces square-bracket]
+              \} [paren [(dec braces-depth) idx] square-bracket]
+              \] [paren braces [(dec square-bracket-depth) idx]]
+              [paren braces square-bracket])]
+        (if tail
+          (when-not (closing-while-another-open? head (mapv #(into %1 [%2]) [paren braces square-bracket] [\) \} \]]))
+            (recur (inc idx) tail new-paren new-braces new-square-bracket))
+          (every? closed? [new-paren new-braces new-square-bracket]))))))
+
+(defn balanced-brackets-2 [s]
+  (loop [[head & tail] s
+         paren-depth 0
+         braces-depth 0
+         square-bracket-depth 0]
+    (let [[new-paren new-braces new-square-bracket]
+          (condp = head
+            \( [(inc paren-depth) braces-depth square-bracket-depth]
+            \{ [paren-depth (inc braces-depth) square-bracket-depth]
+            \[ [paren-depth braces-depth (inc square-bracket-depth)]
+            \) [(dec paren-depth) braces-depth square-bracket-depth]
+            \} [paren-depth (dec braces-depth) square-bracket-depth]
+            \] [paren-depth braces-depth (dec square-bracket-depth)]
+            [paren-depth braces-depth square-bracket-depth])]
+      (if tail
+        (recur tail new-paren new-braces new-square-bracket)
+        (every? zero? [new-paren new-braces new-square-bracket])))))
+
+(defn balanced-brackets-3 [s]
+  (let [not-noise #{\( \) \} \{ \] \[}
+        openness #(cond (#{\( \{ \[} %) :open (#{\) \} \]} %) :close)
+        typeof #(cond (#{\( \)} %) :paren (#{\} \{} %) :braces (#{\] \[} %) :square-bracket)
+        balanced-f? #(loop [[head & tail] %
+                            depths {:paren 0 :braces 0 :square-bracket 0}]
+                       (let [new-depths (if (not-noise head)
+                                          (update-in depths
+                                                     [(typeof head)]
+                                                     (condp = (openness head) :open inc :close dec))
+                                          depths)]
+                         (if tail (recur tail new-depths) (every? zero? (vals new-depths)))))]
+    (let [bad-nesting? (->> s
+                            (filter not-noise)
+                            (partition 2 1)
+                            (filter (fn [xs] (and (= [:open :close] (map openness xs))
+                                                  (apply not= (map typeof xs)))))
+                            seq)]
+      (when (not bad-nesting?) (balanced-f? s)))))
+
+(defn x-70 []
+  (balanced-brackets-3 "This string has no brackets." #_"())" #_"[ { ] } "))
+
+(defn sequs-horribilis-1 [n xs accum-in]
+  (assert (number? accum-in))
+  (let [local-recur (fn [{:keys [head depth] :as node}]
+                      (assert (number? depth))
+                      (if (sequential? head)
+                        (do
+                          (println "head" head "accum" depth "first of head" (first head))
+                          (sequs-horribilis-1 n head depth))
+                        node))]
+    (loop [[head & tail] xs
+           res []
+           accum accum-in]
+      (assert (number? accum))
+      (let [node {:head head :depth (if (number? head)
+                                      (+ head accum)
+                                      accum)}]
+        (if tail
+          (recur tail (conj res (local-recur node)) (if (number? head)
+                                                      (+ head accum)
+                                                      accum))
+          (conj res (local-recur node)))))))
+
+(defn sequs-horribilis-2 [n xs depth-in]
+  (let [local-recur (fn [{:keys [head depth] :as node}]
+                      (if (sequential? head)
+                        (sequs-horribilis-2 n head (inc depth))
+                        node))]
+    (loop [[head & tail] xs
+           res []
+           depth depth-in]
+      (let [node {:head head :depth depth}]
+        (if tail
+          (recur tail (conj res (local-recur node)) depth)
+          (conj res (local-recur node)))))))
+
+(defn sequs-horribilis-3 [n-in xs-in]
+  (letfn [(sequs ([n xs depth-in]
+                  (let [local-recur (fn [{:keys [head depth] :as node}]
+                                      (if (sequential? head)
+                                        (sequs n head (inc depth))
+                                        node))]
+                    (loop [[head & tail] xs
+                           res []
+                           depth depth-in]
+                      (let [node {:head head :depth depth}]
+                        (if tail
+                          (recur tail (conj res (local-recur node)) depth)
+                          (conj res (local-recur node))))))))]
+    (->> (sequs n-in xs-in 0)
+         flatten
+         (cons {:depth 0})
+         (partition 2 1))))
+
+(defn sequs-horribilis-4 [n-in xs-in]
+  (letfn [(maybe-recur ([h d n]
+                        (if (sequential? h)
+                          (sequs n h (inc d))
+                          {:num h :depth d})))
+          (sequs ([n xs depth-in]
+                  (let []
+                    (loop [[h & t] xs
+                           res []
+                           depth depth-in]
+                      (if t
+                        (recur t (conj res (maybe-recur h depth n)) depth)
+                        (conj res (maybe-recur h depth n)))))))
+          (this-fn ([n xs]
+                     ;(println xs)
+                    (loop [[{:keys [num depth-diff] :as h} & t] xs
+                           accum 0
+                           res []]
+                      ;(println "num" num)
+                      (assert num xs)
+                      (let [new-accum (+ num accum)
+                            new-res (if (and depth-diff (pos? depth-diff))
+                                      (conj res (this-fn 0 [(assoc h :depth-diff 0)]))
+                                      (conj res h))]
+                        (if (<= new-accum n)
+                          (recur t
+                                 new-accum
+                                 new-res)
+                          new-res)))))]
+    (->> (sequs n-in xs-in 0)
+         flatten
+         (cons {:depth 0})
+         (partition 2 1)
+         (map (fn [[{depth-a :depth} {depth-b :depth num :num}]]
+                {:num num :depth-diff (- depth-b depth-a)}))
+         (this-fn n-in))))
+
+;; Next loop/recur with in, out, accum so can short circuit when have reached the right number
+;; Then partition by depth and reduce thru that
+(defn x-71 []
+  (->> (sequs-horribilis-4 10 [1 2 [3 [4 5] 6] 7])))
+
+(defn sequs-horribilis-5 [n-in xs-in]
+  (letfn [(maybe-recur ([h d n a]
+                        (if (sequential? h)
+                          (sequs n h (inc d) (+ a (if (sequential? h) 0 h)))
+                          {:num h :depth d :acc (+ a (if (sequential? h) 0 h))})))
+          (sequs ([n xs depth-in accum]
+                  (loop [[h & t] xs
+                         res []
+                         depth depth-in
+                         acc accum]
+                    (assert (number? acc))
+                    (if t
+                      (recur t
+                             (conj res
+                                   (maybe-recur h depth n acc))
+                             depth
+                             (+ acc (if (sequential? h) 0 h)))
+                      (conj res (maybe-recur h depth n acc))))))]
+    (->> (sequs n-in xs-in 0 0))))
+
+(defn x-72 []
+  (->> (sequs-horribilis-5 10 [1 2 [3 [4 5] 6] 7])))
+
+(defn x-73 []
+  (->> (flatten [1 2 [3 [4 5] 6] 7])
+       (reductions +)
+       (take-while #(<= % 10))
+       count))
+
+(defn sequs-horribilis-6 [n-in xs-in]
+  (let [out-count (->> (flatten xs-in)
+                       (reductions +)
+                       (take-while #(< % n-in))
+                       count)]
+    (letfn [(maybe-recur ([h n idx]
+                          (if (sequential? h)
+                            (sequs n h idx)
+                            (if (<= idx out-count)
+                              h
+                              nil))))
+            (sequs ([n xs idx]
+                    (loop [[h & t] xs
+                           res []
+                           idx idx]
+                      (let [maybe-res (maybe-recur h n idx)]
+                        (if (nil? maybe-res)
+                          res
+                          (if (nil? t)
+                            (conj res maybe-res)
+                            (recur t
+                                   (conj res
+                                         maybe-res)
+                                   (inc idx))))))))]
+      (->> (sequs n-in xs-in 0)))))
+
+(defn x-74 []
+  (->> (sequs-horribilis-6 10 [1 2 [3 [4 5] 6] 7])))
+
+(defn sequs-horribilis-7 [upper xs]
+  (let [cost (fn [ele]
+               (if (sequential? ele)
+                 (apply + (flatten ele))
+                 ele))
+        fit (fn [n c]
+              (if (sequential? n)
+                (sequs-horribilis-7 c n)
+                (do
+                  (println "At" n "c is" c)
+                  (when (<= c n) c))))
+        allowances (reductions #(- %1 (cost %2)) upper xs)]
+    ;(println allowances)
+    (->> (map fit xs allowances)
+         (take-while #(or (number? %) (seq %)))
+         )))
+
+(defn prune-1 [n xs]
+  (let [cost (fn [node] (if (sequential? node) (apply + (flatten node)) node))
+        fit (fn [n node] (if (sequential? node) (prune-1 n node) (when (<= node n) node)))
+        allowances (reductions #(- % (cost %2)) n xs)
+        pruned (map fit allowances xs)]
+    (println "allowances" allowances)
+    (take-while #(or (number? %) (seq %)) pruned)))
+
+(defn x-75 []
+  (->> (sequs-horribilis-7 10 [1 2 [3 [4 5] 6] 7])))
+
+(defn x-76 []
+  (->> '(1 2 (3 (4 nil) nil) nil)
+       (take-while #(or (number? %) (seq %)))))
+
+(defn x-77 []
+  (seq [4 nil 5]))
+
+;; (1 2 (3 (4 (5 (6 (7))))))
+(defn x-78 []
+  (prune-1 30 [1 2 [3 [4 [5 [6 [7 8]] 9]] 10] 11]))
+
+;;
+;; Reduction for the cost of each one.
+;; Output nil in map if not less than or equal to n
+;; Thus trim by take-while not-nil (alternatively number?)
+(defn prune-2 [n xs]
+  (let [allowances (reductions #(- %1 %2) n xs)]
+    (->> (map (fn [a x]
+                (println "cf" a x)
+                (when (>= a 0) x)) allowances xs)
+         (take-while number?))))
+
+(defn x-79 []
+  (prune-2 5 [1 2 3 4 5]))
