@@ -1480,15 +1480,125 @@
   (prune-1 30 [1 2 [3 [4 [5 [6 [7 8]] 9]] 10] 11]))
 
 ;;
-;; Reduction for the cost of each one.
-;; Output nil in map if not less than or equal to n
-;; Thus trim by take-while not-nil (alternatively number?)
+;; We want the ones to
+;;
 (defn prune-2 [n xs]
-  (let [allowances (reductions #(- %1 %2) n xs)]
+  (let [node-cost (fn [x] (if (sequential? x) (->> x flatten (apply +)) x))
+        allowances (reductions #(- %1 (node-cost %2)) n xs)]
+    (println "allowances" allowances)
+    (println "from      " xs)
     (->> (map (fn [a x]
-                (println "cf" a x)
-                (when (>= a 0) x)) allowances xs)
-         (take-while number?))))
+                (if (sequential? x)
+                  (prune-2 a x)
+                  (when (>= a x) x)))
+              allowances xs)
+         (take-while (some-fn number? sequential?))
+         vec)))
 
 (defn x-79 []
-  (prune-2 5 [1 2 3 4 5]))
+  (prune-2 10 [1 2 [3 [4 5] 6] 7]))
+
+(defn divides [n step]
+  (->> (range 0 n step)
+       (apply +)))
+
+(defn big-divide-1 [n s1 s2]
+  (let [summed-divides (fn [n step] (range 0 n step))]
+    (apply + (into #{} (concat (summed-divides n s1) (summed-divides n s2))))))
+
+(defn big-divide-2 [n s1 s2]
+  (let [iteree (fn [x]
+                 (cond
+                   (zero? (/ x s1)) x
+                   (zero? (/ x s2)) x
+                   :else nil
+                   ))]
+    (->> (iterate iteree 0)
+         (keep identity)
+         (take-while #(< % n)))))
+
+(defn big-divide-working [n s1 s2]
+  (let [divides (fn [n step] (range 0 n step))]
+    (apply + (distinct (concat (divides n s1) (divides n s2))))
+    ))
+
+(defn big-divide-3 [n s1 s2]
+  (let [iteree (fn [[a b _ res]]
+                 (let [a-added (+ a s1)
+                       b-added (+ b s2)
+                       lowest (min a-added b-added)]
+                   (if (= a-added b-added)
+                     [a-added b-added a-added (conj res a-added)]
+                     (if (= lowest a-added)
+                       [a-added b a-added (conj res a-added)]
+                       [a b-added b-added (conj res b-added)]))))]
+    (->> (iterate iteree [0 0 0 []])
+         (drop-while (fn [[a b last-added res]]
+                       (< last-added n)))
+         first
+         last
+         butlast
+         (apply +)
+         )))
+
+;; Try adding as we go along
+(defn big-divide-4 [n s1 s2]
+  (let [iteree (fn [[a b _ res]]
+                 (let [a-added (+ a s1)
+                       b-added (+ b s2)
+                       lowest (min a-added b-added)]
+                   (if (= a-added b-added)
+                     [a-added b-added a-added (+ res a-added)]
+                     (if (= lowest a-added)
+                       [a-added b a-added (+ res a-added)]
+                       [a b-added b-added (+ res b-added)]))))]
+    (->> (iterate iteree [0 0 0 0])
+         (drop-while (fn [[a b last-added res]]
+                       (< last-added n)))
+         first
+         last
+         (#(- % n))
+         )))
+
+;; Adding together the result of adding is really multiplying
+(defn big-divide-5 [n s1 s2]
+  (let [times-s1 (inc (quot (dec n) s1))
+        times-s2 (inc (quot (dec n) s2))
+        s1-seq (->> (iterate (partial + s1) 0)
+                    (take times-s1))
+        s2-seq (->> (iterate (partial + s2) 0)
+                    (take times-s2))]
+    ;[[times-s1 times-s2] [s1-seq s2-seq]]
+    (+ (apply + (distinct (concat s1-seq s2-seq))))
+    ))
+
+;; We can calculate the common ones and remove them from one of the sequences
+;; Which is equivalent to minus-ing them once
+(defn big-divide-6 [n s1 s2]
+  (let [ar-sum (fn [m n] (* m (inc n) (/ n 2)))
+        together (* s1 s2)
+        times-together (inc (quot (dec n) together))
+        times-s1 (inc (quot (dec n) s1))
+        times-s2 (quot (dec n) s2)
+        s1-seq (->> (iterate (partial + s1) 0)
+                    (take times-s1))
+        s1-seq (ar-sum s1 times-s1)
+        s2-seq (->> (iterate (partial + s2) 0)
+                    (take times-s2))]
+    (- (+ s1-seq (apply + s2-seq))
+       (apply + (->> (iterate (partial + together) 0)
+                     (take times-together))))))
+
+(defn x-80 []
+  (big-divide-6 1000 3 5))
+
+;; Test why this formula doesn't work
+(defn x-81 []
+  (let [num 3
+        n 10
+        ar-sum (fn [m n] (* m n (/ n 2)))
+        times-s1 (inc (quot (dec n) num))
+        s1-seq (->> (iterate (partial + num) 0)
+                    (take times-s1))
+        ]
+    [s1-seq (apply + s1-seq) (ar-sum num times-s1)]))
