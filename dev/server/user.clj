@@ -1401,11 +1401,17 @@
     (+ (apply + (distinct (concat s1-seq s2-seq))))
     ))
 
+(defn ar-sum [step n]
+  (let [num-steps (quot n step)
+        last-num (* num-steps step)
+        mid-way (/ last-num 2)
+        sum (* mid-way (inc num-steps))]
+    sum))
+
 ;; We can calculate the common ones and remove them from one of the sequences
 ;; Which is equivalent to minus-ing them once
 (defn big-divide-6 [n s1 s2]
-  (let [ar-sum (fn [m n] (* m (inc n) (/ n 2)))
-        together (* s1 s2)
+  (let [together (* s1 s2)
         times-together (inc (quot (dec n) together))
         times-s1 (inc (quot (dec n) s1))
         times-s2 (quot (dec n) s2)
@@ -1418,6 +1424,12 @@
        (apply + (->> (iterate (partial + together) 0)
                      (take times-together))))))
 
+(defn ar-sum [step n]
+  (let [num-steps (quot (dec n) step)
+        last-num (* num-steps step)
+        mid-way (/ last-num 2)]
+    (* mid-way (inc num-steps))))
+
 (defn x-80 []
   (big-divide-6 1000 3 5))
 
@@ -1425,9 +1437,100 @@
 (defn x-81 []
   (let [num 3
         n 10
-        ar-sum (fn [m n] (* m n (/ n 2)))
         times-s1 (inc (quot (dec n) num))
+        _ (println "times" times-s1)
         s1-seq (->> (iterate (partial + num) 0)
                     (take times-s1))
         ]
-    [s1-seq (apply + s1-seq) (ar-sum num times-s1)]))
+    [s1-seq
+     (apply + s1-seq)
+     (ar-sum num n)]))
+
+(defn x-82 []
+  (let [n 13
+        step 3
+        num-steps (quot n step)
+        last-num (* num-steps step)
+        mid-way (/ last-num 2)
+        sum (* mid-way (inc num-steps))]
+    sum))
+
+(defn big-divide-7 [n s1 s2]
+  (let [sum-f (fn [step n]
+                (let [num-steps (quot (dec n) step)
+                      last-num (* num-steps step)
+                      mid-way (/ last-num 2)]
+                  (* mid-way (inc num-steps))))
+        s1-sum (sum-f s1 n)
+        s2-sum (sum-f s2 n)
+        together-sum (sum-f (* s1 s2) n)
+        ]
+    (- (+ s1-sum s2-sum) together-sum)))
+
+(defn x-83 []
+  (big-divide-7 100000000 3 5)
+  ;[(ar-sum 3 10) (ar-sum 5 10)]
+  )
+
+(defn transitive-closure-1 [tuples]
+  (let [abutting-comp (comparator (fn [[ll lr] [rl rr]] (= lr rl)))
+        left (set (map first tuples))
+        right (set (map second tuples))
+        in-common (clojure.set/intersection left right)
+        _ (println left right in-common)
+        transitives (->> in-common
+                         (map (fn [item] (filter (fn [[l r]] (or (= item l) (= item r))) tuples)))
+                         (mapv (fn [xs] (sort abutting-comp xs)))
+                         probe-on
+                         (map (fn [[[ll lr] [rl rr]]] [ll rr]))
+                         )]
+    (into tuples transitives)))
+
+(def data-1 #{[8 4] [9 3] [4 2] [27 9]})
+(def data-2 #{["cat" "man"] ["man" "snake"] ["spider" "cat"]})
+
+(defn x-84 []
+  (transitive-closure-1 data-2))
+
+(defn insert-before-idx [v n e]
+  (assert (<= n (count v)))
+  (if (= n (count v))
+    (into v [e])
+    (let [l (subvec v 0 n)
+          r (subvec v n (count v))]
+      (into l (into [e] r)))))
+
+;; If it is a right one that gets a match we need to insert the left one
+;; before where the match is. This returns the idx where to insert it and
+;; what to insert
+(defn whereis [l r xs]
+  (let [il (.indexOf xs l)
+        ir (.indexOf xs r)]
+    (cond
+      (= [-1 -1] [il ir]) nil
+      (not= -1 il) [(inc il) r]
+      (not= -1 ir) [ir l])))
+
+(defn x-87 []
+  (let [v ["Baboon" "Bear" "Rabbit"]
+        [where what] (whereis "Bear" "Tiger" v)]
+    (insert-before-idx v where what)))
+
+(defn transitive-closure-2 [tuples]
+  (let [lists (->> tuples
+                   (reduce (fn [acc [l r]]
+                             (println "Doing" l r)
+                             (let [wheres (map #(whereis l r %) acc)]
+                               (if (empty? (remove nil? wheres))
+                                 (conj acc [l r])
+                                 (let []
+                                   (println wheres)
+                                   acc))))
+                           [["Bear" "Panther"]]))]
+    lists))
+
+(defn x-85 []
+  (transitive-closure-2 data-2))
+
+(defn x-86 []
+  (insert-before-idx [:a :b :c] 4 :z))
