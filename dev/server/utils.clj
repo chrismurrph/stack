@@ -208,15 +208,15 @@
     :else (concat (mapv #(cons (first population) %) (combinations (rest population) (dec sz)))
                   (combinations (rest population) sz))))
 
-(defn rotations [a-seq]
-  (rest (map concat (tails a-seq) (inits a-seq))))
+(comment (defn rotations [a-seq]
+           (rest (map concat (tails a-seq) (inits a-seq)))))
 
-(defn permutations [a-set]
-  (if (empty? a-set)
-    (list ())
-    (mapcat
-      (fn [[x & xs]] (map #(cons x %) (permutations xs)))
-      (rotations a-set))))
+(comment (defn permutations [a-set]
+           (if (empty? a-set)
+             (list ())
+             (mapcat
+               (fn [[x & xs]] (map #(cons x %) (permutations xs)))
+               (rotations a-set)))))
 
 (defn digits->number [digits]
   (reduce (fn [a b] (+ (* a 10) b)) 0 digits))

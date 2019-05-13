@@ -1516,21 +1516,220 @@
         [where what] (whereis "Bear" "Tiger" v)]
     (insert-before-idx v where what)))
 
+(defn combinations [population sz]
+  (cond
+    (= sz 0) '(())
+    (empty? population) '()
+    :else (concat (mapv #(cons (first population) %) (combinations (rest population) (dec sz)))
+                  (combinations (rest population) sz))))
+
 (defn transitive-closure-2 [tuples]
-  (let [lists (->> tuples
-                   (reduce (fn [acc [l r]]
-                             (println "Doing" l r)
-                             (let [wheres (map #(whereis l r %) acc)]
-                               (if (empty? (remove nil? wheres))
-                                 (conj acc [l r])
-                                 (let []
-                                   (println wheres)
-                                   acc))))
-                           [["Bear" "Panther"]]))]
-    lists))
+  (->> tuples
+       (reduce (fn [acc [l r]]
+                 (let [wheres (map #(whereis l r %) acc)]
+                   (if (empty? (remove nil? wheres))
+                     (conj acc [l r])
+                     (let [updater (->> wheres
+                                        (map-indexed #(when (some? %2) (into [%1] %2)))
+                                        (some #(when (some? %) %)))
+                           where-1 (first updater)
+                           where-2 (second updater)
+                           what (first (drop 2 updater))]
+                       (update acc where-1 (fn [v]
+                                             (insert-before-idx v where-2 what)))))))
+               [])
+       (mapcat #(map vec (combinations % 2)))
+       (into #{})))
+
+;; Same but functions included
+(defn transitive-closure-3 [tuples]
+  (letfn [(combos [pop sz]
+            (cond
+              (= sz 0) '(())
+              (empty? pop) '()
+              :else (concat (mapv #(cons (first pop) %) (combos (rest pop) (dec sz)))
+                            (combos (rest pop) sz))))]
+    (let [whereis (fn [l r xs]
+                    (let [il (.indexOf xs l)
+                          ir (.indexOf xs r)]
+                      (cond
+                        (= [-1 -1] [il ir]) nil
+                        (not= -1 il) [(inc il) r]
+                        (not= -1 ir) [ir l])))
+          insert-before-idx (fn [v n e]
+                              (if (= n (count v))
+                                (into v [e])
+                                (let [l (subvec v 0 n)
+                                      r (subvec v n (count v))]
+                                  (into l (into [e] r)))))
+          some? #(-> % nil? not)]
+      (->> tuples
+           (reduce (fn [acc [l r]]
+                     (let [wheres (map #(whereis l r %) acc)]
+                       (if (empty? (remove nil? wheres))
+                         (conj acc [l r])
+                         (let [updater (->> wheres
+                                            (map-indexed #(when (some? %2) (into [%1] %2)))
+                                            (some #(when (some? %) %)))
+                               where-1 (first updater)
+                               where-2 (second updater)
+                               what (first (drop 2 updater))]
+                           (update-in acc [where-1] (fn [v]
+                                                      (insert-before-idx v where-2 what)))))))
+                   [])
+           (mapcat #(map vec (combos % 2)))
+           (into #{})))))
 
 (defn x-85 []
-  (transitive-closure-2 data-2))
+  (transitive-closure-3 data-2))
 
 (defn x-86 []
   (insert-before-idx [:a :b :c] 4 :z))
+
+(defn x-87 []
+  (mapcat #(combo/combinations % 2) [[8 4 2] [27 9 3]]))
+
+(defn x-88 []
+  (combo/combinations [27 9 3] 2))
+
+(defn connected-graph? [tuples]
+  (let [whereis (fn [l r xs]
+                  (let [il (.indexOf xs l)
+                        ir (.indexOf xs r)]
+                    (cond
+                      (= [-1 -1] [il ir]) nil
+                      (not= -1 il) [(inc il) r]
+                      (not= -1 ir) [ir l])))
+        insert-before-idx (fn [v n e]
+                            (if (= n (count v))
+                              (into v [e])
+                              (let [l (subvec v 0 n)
+                                    r (subvec v n (count v))]
+                                (into l (into [e] r)))))
+        some? #(-> % nil? not)
+        tuples->runs (fn [already tuples]
+                       (reduce (fn [acc [l r]]
+                                 (let [wheres (map #(whereis l r %) acc)]
+                                   (if (empty? (remove nil? wheres))
+                                     (conj acc [l r])
+                                     (let [updater (->> wheres
+                                                        (map-indexed #(when (some? %2) (into [%1] %2)))
+                                                        (some #(when (some? %) %)))
+                                           where-1 (first updater)
+                                           where-2 (second updater)
+                                           what (first (drop 2 updater))]
+                                       (update-in acc [where-1] (fn [v]
+                                                                  (insert-before-idx v where-2 what)))))))
+                               already
+                               tuples))
+        grouped (->> tuples
+                     ((partial tuples->runs []))
+                     (group-by count))
+        new-tuples (get grouped 2)
+        non-tuple-key (first (disj (set (keys grouped)) 2))
+        in-again (get grouped non-tuple-key)
+        ]
+    (= 1 (count (tuples->runs in-again new-tuples)))))
+
+(def data-1 #{[1 2] [2 3] [3 1] [4 5] [5 6] [6 4]})
+(def data-2 #{[:a :b] [:b :c] [:c :d] [:x :y] [:d :a] [:b :e] [:x :a]})
+
+(defn x-89 []
+  (connected-graph? data-2))
+
+(defn possible-sums [test]
+  (map (fn [xs] (apply + xs)) (mapcat #(combinations test %) (range 1 (-> test count inc)))))
+
+(defn x-90 []
+  (let [tests [(set [-1 1 99]) (set [-2 2 888]) (set [-3 3 7777])]]
+    (apply clojure.set/intersection (map #(-> % possible-sums set) tests))))
+
+(defn equivalent [& sets]
+  (letfn [(combos [pop sz]
+            (cond
+              (= sz 0) '(())
+              (empty? pop) '()
+              :else (concat (mapv #(cons (first pop) %) (combos (rest pop) (dec sz)))
+                            (combos (rest pop) sz))))]
+    (let [possible-sums (fn [test]
+                          (map (fn [xs] (apply + xs)) (mapcat #(combos test %) (range 1 (-> test count inc)))))]
+      (-> (apply clojure.set/intersection (map #(-> % possible-sums set) sets)) count zero? not))))
+
+(defn x-91 []
+  (apply equivalent [(set [-1 1 99]) (set [-2 2 888]) (set [-3 3 7777])]))
+
+(defn insertion? [[w1 w2]]
+  (let [extra-letters (clojure.set/difference (set w2) (set w1))]
+    (when (= 1 (count extra-letters))
+      (let [w2-without (apply str (remove extra-letters w2))]
+        (= w1 w2-without)))))
+
+(defn deletion? [[w1 w2]]
+  (let [removed-letters (clojure.set/difference (set w1) (set w2))]
+    (when (= 1 (count removed-letters))
+      (let [w1-without (apply str (remove removed-letters w1))]
+        (= w2 w1-without)))))
+
+(defn substitution? [[w1 w2]]
+  (let [extra-letters (clojure.set/difference (set w2) (set w1))
+        removed-letters (clojure.set/difference (set w1) (set w2))]
+    (when (= 1 (count removed-letters) (count extra-letters))
+      (let [w1-without (apply str (remove removed-letters w1))
+            w2-without (apply str (remove extra-letters w2))]
+        (= w2-without w1-without)))))
+
+(defn chain-1? [w1 w2]
+  ((some-fn insertion? deletion? substitution?) [w1 w2]))
+
+;;
+;; Better way than all the above is to loop-recur, chopping down the w1 and w2 params as go.
+;; Will need to look ahead to determine exactly what it is. Actually as we are looking for just
+;; one we can do a complete look ahead and short circuit on first difference. The short circuit
+;; will return T or F as we only want one letter difference.
+;;
+
+(defn chain-2? [w1 w2]
+  (loop [[h1 & t1 :as w1] w1
+         [h2 & t2 :as w2] w2]
+    ;(println "t1 t2 ->" t1 t2)
+    ;(println "h1 h2 ->" h1 h2)
+    (cond
+      (and (not= h1 h2) (= (apply str t1) w2)) :deletion
+      (and (= h1 h2) (or t1 t2)) (recur t1 t2)
+      (and (= h1 h2) (and (nil? t1) (nil? t2))) :same
+      (and (not= h1 h2) (= (apply str w1) (apply str t2))) :insertion
+      (and (not= h1 h2) (= (apply str t1) (apply str t2))) :substitution)))
+
+(defn x-92 []
+  (apply chain-2? ["cot" "coat"]))
+
+(defn x-93 []
+  (apply chain-2? ["coat" "oat"]))
+
+;; S/not ret true as must be only one letter difference
+(defn x-94 []
+  (chain-2? "hot" "oat"))
+
+(defn x-94a []
+  (chain-2? "hot" "hat"))
+
+(defn next-possibilities [x xs]
+  (let [chain (fn [w] (when (chain-2? x w) w))]
+    [x (keep chain xs)]))
+
+(defn x-95 []
+  (next-possibilities "hat" #{"coat" "dog" "cat" "oat" "cot" "hot" "hog"}))
+
+(defn form-map [xs]
+  (loop [head (first xs)
+         tail (rest xs)
+         res []]
+    (if (= (count res) (count xs))
+      res
+      (recur (first tail)
+             (rest tail)
+             (conj res (next-possibilities head (remove #{head} xs)))))))
+
+(defn x-96 []
+  (form-map #{"hat" "coat" "dog" "cat" "oat" "cot" "hot" "hog"}))
+
