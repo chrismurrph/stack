@@ -1658,31 +1658,8 @@
 (defn x-91 []
   (apply equivalent [(set [-1 1 99]) (set [-2 2 888]) (set [-3 3 7777])]))
 
-(defn insertion? [[w1 w2]]
-  (let [extra-letters (clojure.set/difference (set w2) (set w1))]
-    (when (= 1 (count extra-letters))
-      (let [w2-without (apply str (remove extra-letters w2))]
-        (= w1 w2-without)))))
-
-(defn deletion? [[w1 w2]]
-  (let [removed-letters (clojure.set/difference (set w1) (set w2))]
-    (when (= 1 (count removed-letters))
-      (let [w1-without (apply str (remove removed-letters w1))]
-        (= w2 w1-without)))))
-
-(defn substitution? [[w1 w2]]
-  (let [extra-letters (clojure.set/difference (set w2) (set w1))
-        removed-letters (clojure.set/difference (set w1) (set w2))]
-    (when (= 1 (count removed-letters) (count extra-letters))
-      (let [w1-without (apply str (remove removed-letters w1))
-            w2-without (apply str (remove extra-letters w2))]
-        (= w2-without w1-without)))))
-
-(defn chain-1? [w1 w2]
-  ((some-fn insertion? deletion? substitution?) [w1 w2]))
-
 ;;
-;; Better way than all the above is to loop-recur, chopping down the w1 and w2 params as go.
+;; Good way is to loop-recur, chopping down the w1 and w2 params as go.
 ;; Will need to look ahead to determine exactly what it is. Actually as we are looking for just
 ;; one we can do a complete look ahead and short circuit on first difference. The short circuit
 ;; will return T or F as we only want one letter difference.
@@ -1720,16 +1697,141 @@
 (defn x-95 []
   (next-possibilities "hat" #{"coat" "dog" "cat" "oat" "cot" "hot" "hog"}))
 
-(defn form-map [xs]
+(defn form-map-1 [xs]
   (loop [head (first xs)
-         tail (rest xs)
+         [h & t] (rest xs)
          res []]
     (if (= (count res) (count xs))
-      res
-      (recur (first tail)
-             (rest tail)
-             (conj res (next-possibilities head (remove #{head} xs)))))))
+      (into {} res)
+      (recur h t (conj res (next-possibilities head (remove #{head} xs)))))))
+
+(defn form-map-2 [xs]
+  (into {} (reduce (fn [acc ele]
+                     (conj acc (next-possibilities ele (remove #{ele} xs))))
+                   []
+                   xs)))
+
+(def data-1 #{"hat" "coat" "dog" "cat" "oat" "cot" "hot" "hog"})
+(def data-2 #{"cot" "hot" "bat" "fat"})
+(def data-3 #{"to" "top" "stop" "tops" "toss"})
+
+(defn x-95a []
+  (form-map-2 data-2))
+
+(defn random-chain-hof [tree]
+  (fn []
+    (loop [out-chain [(-> tree keys rand-nth)]]
+      (if-let [k (->> (get tree (last out-chain))
+                      (remove (set out-chain))
+                      (#(when (seq %) (rand-nth %))))]
+        (recur (conj out-chain k))
+        out-chain))))
+
+(defn word-chains [words]
+  (let [chained? (fn [w1 w2]
+                   (loop [[h1 & t1 :as w1] w1
+                          [h2 & t2 :as w2] w2]
+                     (cond
+                       (and (= h1 h2) (or t1 t2)) (recur t1 t2)
+                       (and (not= h1 h2) (= (apply str t1) w2)) :deletion
+                       (and (not= h1 h2) (= (apply str w1) (apply str t2))) :insertion
+                       (and (not= h1 h2) (= (apply str t1) (apply str t2))) :substitution)))
+        next-possibilities (fn [word xs]
+                             (let [next-link (fn [w] (when (chained? word w) w))]
+                               (keep next-link xs)))
+        form-map (fn [xs] (into {} (reduce #(conj %1 [%2 (next-possibilities %2 (remove #{%2} xs))]) [] xs)))
+        random-chain-hof (fn [tree]
+                           (fn [] (loop [out-chain [(-> tree keys rand-nth)]]
+                                    (if-let [k (->> (get tree (last out-chain))
+                                                    (remove (set out-chain))
+                                                    (#(when (seq %) (rand-nth %))))]
+                                      (recur (conj out-chain k))
+                                      out-chain))))]
+    (->> (repeatedly 100 #((random-chain-hof (form-map words))))
+         (group-by count)
+         keys
+         (apply max)
+         (#(= % (count words))))))
 
 (defn x-96 []
-  (form-map #{"hat" "coat" "dog" "cat" "oat" "cot" "hot" "hog"}))
+  (word-chains data-3))
+
+(defn card-game [trump-suit]
+  (fn [cards]
+    (let [leading-suit (-> cards first :suit)
+          card-comp (comparator (fn [{suit-1 :suit rank-1 :rank} {suit-2 :suit rank-2 :rank}]
+                                  (if (not= suit-1 suit-2)
+                                    (or (= trump-suit suit-1) (= leading-suit suit-1))
+                                    (> rank-1 rank-2))))]
+      (->> cards
+           (sort card-comp)
+           first))))
+
+(def data-1 [{:suit :club :rank 4}
+             {:suit :club :rank 9}])
+(def data-2 [{:suit :spade :rank 2}
+             {:suit :club :rank 10}])
+(def data-3 [{:suit :spade :rank 2}
+             {:suit :club :rank 10}])
+(def data-4 [{:suit :heart :rank 6} {:suit :heart :rank 8}
+             {:suit :diamond :rank 10} {:suit :heart :rank 4}])
+
+(defn x-97 []
+  ((card-game :heart) data-4))
+
+(def data-1
+  ["      "
+   " ##   "
+   " ##   "
+   "   ## "
+   "   ## "
+   "      "])
+(def data-2
+  ["     "
+   "  #  "
+   "  #  "
+   "  #  "
+   "     "])
+
+(defn game-of-life [universe]
+  (let [live-f? (fn [[col row]] (= \# (get-in universe [col row])))
+        live-neighbors-count (fn [col row]
+                               (let [on-board? (some-fn pos? zero?)]
+                                 (->> (for [dx [-1 0 1]
+                                            dy [-1 0 1]
+                                            :when (not (= 0 dx dy))]
+                                        [(+ col dx) (+ row dy)])
+                                      (filter (fn [[col row]] (and (on-board? col) (on-board? row))))
+                                      (filter live-f?)
+                                      count)))
+        future-f (fn [live? num-neighbors]
+                   (if live?
+                     (cond
+                       (< num-neighbors 2) \space
+                       (> num-neighbors 3) \space
+                       :else \#)
+                     (if (= 3 num-neighbors)
+                       \#
+                       \space)))
+        row-size (-> universe first count)
+        num-rows (count universe)]
+    (->> (for [col (range row-size)
+               row (range num-rows)]
+           (future-f (live-f? [col row]) (live-neighbors-count col row)))
+         (partition row-size)
+         (mapv (partial apply str)))))
+
+(defn x-98 []
+  (game-of-life data-2))
+
+(defn neighbors [col row]
+  (let [on-board? (some-fn pos? zero?)]
+    (->> (for [dx [-1 0 1]
+               dy [-1 0 1]
+               :when (not (= 0 dx dy))]
+           [(+ col dx) (+ row dy)])
+         (filter (fn [[col row]] (and (on-board? col) (on-board? row)))))))
+
+(defn x-99 []
+  (neighbors 0 0))
 
