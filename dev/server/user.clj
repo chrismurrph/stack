@@ -1835,3 +1835,341 @@
 (defn x-99 []
   (neighbors 0 0))
 
+(defn breath-first-search [starting-lab generate-possible-moves destination-state?]
+  (loop [already-tested #{starting-lab}
+         last-round #{starting-lab}]
+    (let [newly-generated (mapcat generate-possible-moves last-round)
+          got-there (first (filter destination-state? newly-generated))]
+      (if got-there
+        (count got-there)
+        (let [now-tested (into already-tested newly-generated)]
+          (recur now-tested (into #{} (remove already-tested newly-generated))))))))
+
+(defn gen-moves [coll]
+  (let [n (last coll)]
+    (for [new-num (remove nil? [(* 2 n) (when (even? n) (/ n 2)) (+ n 2)])]
+      (conj coll new-num))))
+
+(defn number-maze [start end]
+  (let [reached? (fn [curr] (= end (last curr)))
+        gen-moves (fn [coll]
+                    (let [n (last coll)]
+                      (for [new-num (remove nil? [(* 2 n) (when (even? n) (/ n 2)) (+ n 2)])]
+                        (conj coll new-num))))
+        bfs (fn [starting-lab generate-moves dest-state?]
+              (loop [already-tested #{starting-lab}
+                     last-round #{starting-lab}]
+                (let [newly-generated (mapcat generate-moves last-round)
+                      got-there (first (filter dest-state? newly-generated))]
+                  (if got-there
+                    (count got-there)
+                    (let [now-tested (into already-tested newly-generated)]
+                      (recur now-tested (into #{} (remove already-tested newly-generated))))))))]
+    (if (= start end) 1 (bfs [start] gen-moves reached?))))
+
+(defn x-100 []
+  (number-maze 1 1))
+
+(defn graph-tour [graph]
+  (let [reached? (fn [curr-edges] (let [num-remaining (count (remove (set curr-edges) graph))]
+                                    (or (zero? num-remaining)
+                                        (= (inc num-remaining) (count curr-edges)))))
+        gen-moves (fn [edges-so-far]
+                    (let [abuts? (fn [edge search-edge] (or (= (first search-edge) (second edge))
+                                                            (= (second search-edge) (first edge))))
+                          ;; Gives us two nodes to see if we can abut against any of the remaining edges
+                          search-edge (last edges-so-far)
+                          remaining-edges (remove (set edges-so-far) graph)]
+                      (if (seq remaining-edges)
+                        (for [edge remaining-edges
+                              :when (abuts? edge search-edge)]
+                          (conj edges-so-far edge))
+                        [edges-so-far])))
+        bfs (fn [starting-lab generate-moves dest-state?]
+              (loop [already-tested #{starting-lab}
+                     last-round #{starting-lab}]
+                (let [newly-generated (mapcat generate-moves last-round)]
+                  (if (first (filter dest-state? newly-generated))
+                    true
+                    (if (seq newly-generated)
+                      (let [now-tested (into already-tested newly-generated)]
+                        (recur now-tested (into #{} (remove already-tested newly-generated))))
+                      false)))))]
+    (bfs [(rand-nth graph)] gen-moves reached?)))
+
+(def data-1 [[:a :b]])
+(def data-2 [[:a :a] [:b :b]])
+(def data-3 [[:a :b] [:a :b] [:a :c] [:c :a]
+             [:a :d] [:b :d] [:c :d]])
+(def data-4 [[1 2] [2 3] [3 4] [4 1]])
+(def data-5 [[:a :b] [:a :c] [:c :b] [:a :e]
+             [:b :e] [:a :d] [:b :d] [:c :e]
+             [:d :e] [:c :f] [:d :f]])
+(def data-6 [[1 2] [2 3] [2 4] [2 5]])
+
+(defn x-101 []
+  (graph-tour data-1))
+
+(def data-a ["adceg" "abcfg"])
+(def data-1 ["kitten" "sitting"])
+
+;; https://www.youtube.com/watch?v=b6AGUjqIPsA
+(defn levenshtein-distance [source target]
+  (let [matrix (atom [])
+        get-i-j (fn [i j] (get-in @matrix [i j]))
+        set-i-j (fn [i j x] (swap! matrix assoc-in [i j] x))
+        formula-set (fn [i j] (let [above (get-i-j (dec i) j)
+                                    left (get-i-j i (dec j))
+                                    diagonal (get-i-j (dec i) (dec j))]
+                                (if (= (get source (dec i)) (get target (dec j)))
+                                  (set-i-j i j diagonal)
+                                  (set-i-j i j (inc (min above left diagonal))))))
+        target-len (-> target count inc)]
+    (swap! matrix assoc 0 (vec (range target-len)))
+    (doseq [row-num (range 1 (-> source count inc))]
+      (swap! matrix assoc row-num [row-num])
+      (doseq [col-num (range 1 target-len)]
+        (formula-set row-num col-num)))
+    (-> @matrix last last)))
+
+(defn x-102 []
+  (apply levenshtein-distance data-1))
+
+(defn tic-tc-toe-1 [v]
+  (let [all-same? #(-> % frequencies first second ((partial = 3)))
+        winner? (fn [co-ords]
+                  (or
+                    (-> (map first co-ords) all-same?)
+                    (-> (map second co-ords) all-same?)
+                    (= co-ords [[2 0] [1 1] [0 2]])
+                    (= co-ords [[0 0] [1 1] [2 2]])))
+        board->winner (fn [board]
+                        (->> board
+                             (remove (fn [[k _]] (= k :e)))
+                             (map (fn [[k co-ords]] [k (winner? co-ords)]))
+                             (some (fn [[k b?]] (when b? k)))))
+        start-board (->> v
+                         (map-indexed (fn [row-num row] (map-indexed (fn [col-num val] [val [col-num row-num]]) row)))
+                         (mapcat identity)
+                         (group-by first)
+                         (map (fn [[k v]] [k (mapv second v)])))
+        ]
+    (println "co-ords of :es" (-> (filter (fn [[k _]] (= k :e)) start-board) first second))
+    (board->winner start-board)))
+
+(defn tic-tc-toe-2 [player v]
+  (let [three-same? (fn [co-ords] (-> co-ords frequencies vals (#(apply max %)) ((partial = 3))))
+        forward-slash #{[0 2] [1 1] [2 0]}
+        back-slash #{[0 0] [1 1] [2 2]}
+        winner? (fn [co-ords]
+                  (or
+                    (-> (map first co-ords) three-same?)
+                    (-> (map second co-ords) three-same?)
+                    (= forward-slash (clojure.set/intersection forward-slash (set co-ords)))
+                    (= back-slash (clojure.set/intersection back-slash (set co-ords)))
+                    ))
+        board->winner #(->> %
+                            (remove (fn [[k _]] (= k :e)))
+                            (map (fn [[k co-ords]] [k (winner? co-ords)]))
+                            (some (fn [[k b?]] (when b? k))))
+        start-board (->> v
+                         (map-indexed (fn [row-num row] (map-indexed (fn [col-num val] [val [row-num col-num]]) row)))
+                         (mapcat identity)
+                         (group-by first)
+                         (map (fn [[k v]] [k (mapv second v)]))
+                         (into {}))
+        empty-spots (-> (filter (fn [[k _]] (= k :e)) start-board) first second)
+        ]
+    (set (filter (fn [co-ord]
+                   (board->winner (probe-on (update start-board player conj co-ord))))
+                 empty-spots))))
+
+(defn x-103 []
+  (tic-tc-toe-2 :x [[:o :e :e]
+                    [:o :x :o]
+                    [:x :x :e]]))
+
+(defn x-104 []
+  (let [forward-slash #{[0 2] [1 1] [2 0]}
+        back-slash #{[0 0] [1 1] [2 2]}
+        all-same? #(-> % frequencies probe-on first second ((partial = 3)))
+        three-same? (fn [co-ords] (-> co-ords frequencies vals (#(apply max %)) ((partial = 3))))
+        winner? (fn [co-ords]
+                  ;(println co-ords)
+                  (or
+                    (-> (map first co-ords) three-same?)
+                    (-> (map second co-ords) three-same?)
+                    (= forward-slash (clojure.set/intersection forward-slash (set co-ords)))
+                    (= back-slash (clojure.set/intersection back-slash (set co-ords)))
+                    ))
+        board->winner #(->> %
+                            (remove (fn [[k _]] (= k :e)))
+                            (map (fn [[k co-ords]] [k (winner? co-ords)]))
+                            (some (fn [[k b?]] (when b? k))))]
+    (board->winner {:o [[0 0] [1 0] [1 2]], :e [[0 1] [0 2] [2 2]], :x [[1 1] [2 0] [2 1] [2 2]]})))
+
+(defn x-105 []
+  (let [forward-slash #{[0 2] [1 1] [2 0]}
+        back-slash #{[0 0] [1 1] [2 2]}
+        ]
+    (= forward-slash (clojure.set/intersection forward-slash #{[1 1] [2 0] [2 1] [0 2]}))))
+
+(defn palindromic-split [digits]
+  (let [num-digits (count digits)
+        side-take-count (quot num-digits 2)
+        right (apply str (drop ((if (odd? num-digits)
+                                  inc
+                                  identity) side-take-count) digits))
+        left (apply str (take side-take-count digits))]
+    [left right]))
+
+(defn x-105b []
+  (palindromic-split "162"))
+
+;; To get the next, even when left and right are not palindromic. Called once only.
+;; If palindromic already, s is returned
+(defn next-palindromic [s]
+  (let [palindromic-split (fn [digits]
+                            (let [num-digits (count digits)
+                                  side-take-count (quot num-digits 2)
+                                  right (apply str (drop ((if (odd? num-digits)
+                                                            inc
+                                                            identity) side-take-count) digits))
+                                  left (apply str (take side-take-count digits))
+                                  central (if (odd? num-digits)
+                                            (str (first (drop side-take-count digits)))
+                                            "")]
+                              [left right central]))
+        [left right central] (palindromic-split s)
+        [extreme-f central] (cond
+                              (= "" central) [max central]
+                              (= "9" central) [max central]
+                              :else [min (-> central Long/parseLong inc str)])]
+    (loop [[h-trailing & t-trailing] right
+           [h-folded & t-folded] (apply str (reverse left))
+           ;; The front is folded under the back, so collection is like that too
+           over []
+           under []]
+      (if h-folded
+        (let [trailing-int (Long/parseLong (str h-trailing))
+              folded-int (Long/parseLong (str h-folded))]
+          (if (not= trailing-int folded-int)
+            (let [biggest (first (str (extreme-f trailing-int folded-int)))]
+              (recur t-trailing t-folded (conj over biggest) (conj under biggest)))
+            (recur t-trailing t-folded (conj over h-trailing) (conj under h-folded))))
+        (str (apply str (reverse under))
+             central
+             (apply str over))))))
+
+;; S/be 171, getting 262
+(defn x-105c []
+  (next-palindromic "162"))
+
+(defn idxs-to-inc-f [s]
+  (let [abs (fn [val] (if (neg? val) (* -1 val) val))
+        centre (float (/ (-> s count dec) 2))
+        m (->> s
+               (map-indexed (fn [idx c]
+                              (when (< (Long/parseLong (str c)) 9)
+                                idx)))
+               (remove nil?)
+               (map (juxt identity #(- % centre)))
+               (group-by #(-> % second abs))
+               )]
+    (map first (get m (->> m keys (apply min))))))
+
+;; Assumes is given a palindromic number
+(defn following-palindromic [s]
+  (let [idxs-to-extreme-f (fn [s]
+                            (let [abs (fn [val] (if (neg? val) (* -1 val) val))
+                                  centre (float (/ (-> s count dec) 2))
+                                  m (->> s
+                                         (map-indexed (fn [idx c]
+                                                        (when (< (Long/parseLong (str c)) 9)
+                                                          idx)))
+                                         (remove nil?)
+                                         (map (juxt identity #(- % centre)))
+                                         (group-by #(-> % second abs)))
+                                  res (->> (map first (get m (->> m keys (apply min))))
+                                           (map #(vector % inc)))]
+                              (if (and (-> s count odd?) (= \9 (get s (int centre))))
+                                (conj res [(int centre) #(- % 9)])
+                                res)))]
+    (if (every? #(= \9 %) s)
+      (str (-> s Long/parseLong inc inc))
+      (let [ch-extreme (fn [f]
+                         (fn [c] (first (str (f (Long/parseLong (str c)))))))]
+        (->> (reduce (fn [s [idx f]]
+                       (update s idx (ch-extreme f)))
+                     (vec s)
+                     (idxs-to-extreme-f s))
+             (apply str))))))
+
+(defn x-108 []
+  (following-palindromic "191"))
+
+(defn palindromic [s]
+  (let [following (fn [s]
+                    (let [idxs-to-extreme-f (fn [s]
+                                              (let [abs (fn [val] (if (neg? val) (* -1 val) val))
+                                                    centre (float (/ (-> s count dec) 2))
+                                                    m (->> s
+                                                           (map-indexed (fn [idx c]
+                                                                          (when (< (Long/parseLong (str c)) 9)
+                                                                            idx)))
+                                                           (remove nil?)
+                                                           (map (juxt identity #(- % centre)))
+                                                           (group-by #(-> % second abs)))
+                                                    res (->> (map first (get m (->> m keys (apply min))))
+                                                             (map #(vector % inc)))]
+                                                (if (and (-> s count odd?) (= \9 (get s (int centre))))
+                                                  (conj res [(int centre) #(- % 9)])
+                                                  res)))]
+                      (if (every? #(= \9 %) s)
+                        (str (-> s Long/parseLong inc inc))
+                        (let [ch-extreme (fn [f]
+                                           (fn [c] (first (str (f (Long/parseLong (str c)))))))]
+                          (->> (reduce (fn [s [idx f]]
+                                         (update s idx (ch-extreme f)))
+                                       (vec s)
+                                       (idxs-to-extreme-f s))
+                               (apply str))))))
+        next (fn [s]
+               (let [palindromic-split (fn [digits]
+                                         (let [num-digits (count digits)
+                                               side-take-count (quot num-digits 2)
+                                               right (apply str (drop ((if (odd? num-digits)
+                                                                         inc
+                                                                         identity) side-take-count) digits))
+                                               left (apply str (take side-take-count digits))
+                                               central (if (odd? num-digits)
+                                                         (str (first (drop side-take-count digits)))
+                                                         "")]
+                                           [left right central]))
+                     [left right central] (palindromic-split s)
+                     [extreme-f central] (cond
+                                           (= "" central) [max central]
+                                           (= "9" central) [max central]
+                                           :else [min (-> central Long/parseLong inc str)])]
+                 (loop [[h-trailing & t-trailing] right
+                        [h-folded & t-folded] (apply str (reverse left))
+                        ;; The front is folded under the back, so collection is like that too
+                        over []
+                        under []]
+                   (if h-folded
+                     (let [trailing-int (Long/parseLong (str h-trailing))
+                           folded-int (Long/parseLong (str h-folded))]
+                       (if (not= trailing-int folded-int)
+                         (let [biggest (first (str (extreme-f trailing-int folded-int)))]
+                           (recur t-trailing t-folded (conj over biggest) (conj under biggest)))
+                         (recur t-trailing t-folded (conj over h-trailing) (conj under h-folded))))
+                     (str (apply str (reverse under))
+                          central
+                          (apply str over))))))
+        starter (next (str s))]
+    (->> (iterate following starter)
+         (map #(Long/parseLong %)))))
+
+(defn x-109 []
+  (->> (palindromic 1234550000)
+       (take 6)))

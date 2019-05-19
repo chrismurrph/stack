@@ -53,20 +53,20 @@
                     (range 1 (Math/ceil (Math/sqrt n))))))
 
 (defn gcd [a b]
-  (fn [a b]
-    (if (zero? b)
-      a
-      (recur b (mod a b)))))
+  (if (zero? b)
+    a
+    (recur b (mod a b))))
 
 (defn lcm [& numbers]
-  (let [gcd-fn (fn [a b] (if (zero? b)
-                        a
-                        (recur b (mod a b))))
+  (let [gcd-fn (fn [a b]
+                 (if (zero? b)
+                   a
+                   (recur b (mod a b))))
         lcm-inner (fn [num1 num2]
-                (let [multiplied (* num1 num2)
-                      gcd (gcd-fn num1 num2)
-                      res (/ multiplied gcd)]
-                  res))
+                    (let [multiplied (* num1 num2)
+                          gcd (gcd-fn num1 num2)
+                          res (/ multiplied gcd)]
+                      res))
         [head & tail] numbers]
     (if (nil? tail)
       head
