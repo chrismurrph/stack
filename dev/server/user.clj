@@ -2079,7 +2079,7 @@
     (map first (get m (->> m keys (apply min))))))
 
 ;; Assumes is given a palindromic number
-(defn following-palindromic [s]
+(defn following-palindromic-1 [s]
   (let [idxs-to-extreme-f (fn [s]
                             (let [abs (fn [val] (if (neg? val) (* -1 val) val))
                                   centre (float (/ (-> s count dec) 2))
@@ -2092,8 +2092,10 @@
                                          (group-by #(-> % second abs)))
                                   res (->> (map first (get m (->> m keys (apply min))))
                                            (map #(vector % inc)))]
-                              (if (and (-> s count odd?) (= \9 (get s (int centre))))
-                                (conj res [(int centre) #(- % 9)])
+                              (if (str/index-of s \9)
+                                (if (= (str/index-of s \9) (str/last-index-of s \9))
+                                  (conj res [(str/index-of s \9) #(- % 9)])
+                                  (concat res [[(str/index-of s \9) #(- % 9)] [(str/last-index-of s \9) #(- % 9)]]))
                                 res)))]
     (if (every? #(= \9 %) s)
       (str (-> s Long/parseLong inc inc))
@@ -2105,71 +2107,86 @@
                      (idxs-to-extreme-f s))
              (apply str))))))
 
-(defn x-108 []
-  (following-palindromic "191"))
+;;
+;;
+;;
+(defn following-palindromic-2 [s]
+  (if (every? #(= % \9) s)
+    (-> s Long/parseLong inc inc str)
+    (let [greedy-grab-count (int (Math/ceil (/ (count s) 2)))
+          [left right] [(take greedy-grab-count s) (drop greedy-grab-count s)]
+          front (->> left (apply str) Long/parseLong inc str)
+          back (->> front reverse (drop (- (count left) (count right))) (apply str))]
+      (str front back))))
 
-(defn palindromic [s]
-  (let [following (fn [s]
-                    (let [idxs-to-extreme-f (fn [s]
-                                              (let [abs (fn [val] (if (neg? val) (* -1 val) val))
-                                                    centre (float (/ (-> s count dec) 2))
-                                                    m (->> s
-                                                           (map-indexed (fn [idx c]
-                                                                          (when (< (Long/parseLong (str c)) 9)
-                                                                            idx)))
-                                                           (remove nil?)
-                                                           (map (juxt identity #(- % centre)))
-                                                           (group-by #(-> % second abs)))
-                                                    res (->> (map first (get m (->> m keys (apply min))))
-                                                             (map #(vector % inc)))]
-                                                (if (and (-> s count odd?) (= \9 (get s (int centre))))
-                                                  (conj res [(int centre) #(- % 9)])
-                                                  res)))]
-                      (if (every? #(= \9 %) s)
-                        (str (-> s Long/parseLong inc inc))
-                        (let [ch-extreme (fn [f]
-                                           (fn [c] (first (str (f (Long/parseLong (str c)))))))]
-                          (->> (reduce (fn [s [idx f]]
-                                         (update s idx (ch-extreme f)))
-                                       (vec s)
-                                       (idxs-to-extreme-f s))
-                               (apply str))))))
+(defn x-108 []
+  (->> (iterate following-palindromic-2 "999")
+       (map #(Long/parseLong %))
+       (take 20)))
+
+(defn x-108a []
+  (following-palindromic-2 "9"))
+
+(defn palindromic [n]
+  (let [s (str n)
+        str->int (fn [s] (Long/parseLong s))
+        following (fn [s]
+                    (if (every? #(= % \9) s)
+                      (-> s str->int inc inc str)
+                      (let [greedy-grab-count (int (Math/ceil (/ (count s) 2)))
+                            [left right] [(take greedy-grab-count s) (drop greedy-grab-count s)]
+                            front (->> left (apply str) str->int inc str)
+                            back (->> front reverse (drop (- (count left) (count right))) (apply str))]
+                        (str front back))))
+        ;; Get non-eager front, reverse it, and put it on the back. Then iterate with `following` starting with
+        ;; that until >= (Long/parseLong s). Even doing all this, if s is palindromic? it will just be returned.
         next (fn [s]
-               (let [palindromic-split (fn [digits]
-                                         (let [num-digits (count digits)
-                                               side-take-count (quot num-digits 2)
-                                               right (apply str (drop ((if (odd? num-digits)
-                                                                         inc
-                                                                         identity) side-take-count) digits))
-                                               left (apply str (take side-take-count digits))
-                                               central (if (odd? num-digits)
-                                                         (str (first (drop side-take-count digits)))
-                                                         "")]
-                                           [left right central]))
-                     [left right central] (palindromic-split s)
-                     [extreme-f central] (cond
-                                           (= "" central) [max central]
-                                           (= "9" central) [max central]
-                                           :else [min (-> central Long/parseLong inc str)])]
-                 (loop [[h-trailing & t-trailing] right
-                        [h-folded & t-folded] (apply str (reverse left))
-                        ;; The front is folded under the back, so collection is like that too
-                        over []
-                        under []]
-                   (if h-folded
-                     (let [trailing-int (Long/parseLong (str h-trailing))
-                           folded-int (Long/parseLong (str h-folded))]
-                       (if (not= trailing-int folded-int)
-                         (let [biggest (first (str (extreme-f trailing-int folded-int)))]
-                           (recur t-trailing t-folded (conj over biggest) (conj under biggest)))
-                         (recur t-trailing t-folded (conj over h-trailing) (conj under h-folded))))
-                     (str (apply str (reverse under))
-                          central
-                          (apply str over))))))
-        starter (next (str s))]
-    (->> (iterate following starter)
-         (map #(Long/parseLong %)))))
+               (let [n (str->int s)
+                     front-count (int (/ (count s) 2))
+                     front (apply str (take front-count s))
+                     reversed-front (apply str (reverse front))
+                     central (if (-> s count even?)
+                               ""
+                               (str (first (drop front-count s))))
+                     starter (str front
+                                  central
+                                  reversed-front)]
+                 (if (or (= "" starter) (= s starter))
+                   s
+                   (->> (iterate following starter)
+                        (drop-while #(< (str->int %) n))
+                        first))))]
+    (->> (iterate following (next s))
+         (map str->int))))
 
 (defn x-109 []
-  (->> (palindromic 1234550000)
-       (take 6)))
+  (nth (palindromic 0) 10101)
+  #_(->> (palindromic 1234550000)
+       (take 6))
+  )
+
+;; Takes too long getting to starting position
+(defn x-110 []
+  (= (first (palindromic (* 111111111 111111111)))
+     (* 111111111 111111111)))
+
+(defn x-111 []
+  (= (set (take 199 (palindromic 0)))
+     (set (map #(first (palindromic %)) (range 0 10000)))))
+
+(defn x-111a []
+  (sort (take 199 (palindromic 0))))
+
+(defn x-111b []
+  (sort (distinct (map #(first (palindromic %)) (range 0 10000)))))
+
+(defn x-111c []
+  (map #(first (palindromic %)) (range 0 1000)))
+
+(defn x-112 []
+  (= true
+     (apply < (take 6666 (palindromic 9999999)))))
+
+(defn x-113 []
+  (= (nth (palindromic 0) 10101)
+     9102019))
