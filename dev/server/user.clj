@@ -3,7 +3,8 @@
             [clojure.string :as str]
             [clojure.pprint :as pprint]
             [clojure.stacktrace :refer [print-stack-trace]]
-            [clojure.math.combinatorics :as combo]))
+            [clojure.math.combinatorics :as combo]
+            [stopwatch :as sw]))
 
 (defn r []
   (require 'user :reload))
@@ -2065,19 +2066,6 @@
 (defn x-105c []
   (next-palindromic "162"))
 
-(defn idxs-to-inc-f [s]
-  (let [abs (fn [val] (if (neg? val) (* -1 val) val))
-        centre (float (/ (-> s count dec) 2))
-        m (->> s
-               (map-indexed (fn [idx c]
-                              (when (< (Long/parseLong (str c)) 9)
-                                idx)))
-               (remove nil?)
-               (map (juxt identity #(- % centre)))
-               (group-by #(-> % second abs))
-               )]
-    (map first (get m (->> m keys (apply min))))))
-
 ;; Assumes is given a palindromic number
 (defn following-palindromic-1 [s]
   (let [idxs-to-extreme-f (fn [s]
@@ -2133,15 +2121,19 @@
         following (fn [s]
                     (if (every? #(= % \9) s)
                       (-> s str->int inc inc str)
-                      (let [greedy-grab-count (int (Math/ceil (/ (count s) 2)))
+                      (let [following-stop-w (sw/take-intervals-hof ["following"])
+                            greedy-grab-count (int (Math/ceil (/ (count s) 2)))
                             [left right] [(take greedy-grab-count s) (drop greedy-grab-count s)]
                             front (->> left (apply str) str->int inc str)
                             back (->> front reverse (drop (- (count left) (count right))) (apply str))]
+                        (following-stop-w 0)
                         (str front back))))
         ;; Get non-eager front, reverse it, and put it on the back. Then iterate with `following` starting with
         ;; that until >= (Long/parseLong s). Even doing all this, if s is palindromic? it will just be returned.
         next (fn [s]
-               (let [n (str->int s)
+               (println "next for" s)
+               (let [next-stop-w (sw/take-intervals-hof ["next"])
+                     n (str->int s)
                      front-count (int (/ (count s) 2))
                      front (apply str (take front-count s))
                      reversed-front (apply str (reverse front))
@@ -2151,11 +2143,13 @@
                      starter (str front
                                   central
                                   reversed-front)]
-                 (if (or (= "" starter) (= s starter))
-                   s
-                   (->> (iterate following starter)
-                        (drop-while #(< (str->int %) n))
-                        first))))]
+                 (let [res (if (or (= "" starter) (= s starter))
+                             s
+                             (->> (iterate following starter)
+                                  (drop-while #(< (str->int %) n))
+                                  first))]
+                   (next-stop-w 0)
+                   res)))]
     (->> (iterate following (next s))
          (map str->int))))
 
@@ -2164,15 +2158,6 @@
   #_(->> (palindromic 1234550000)
        (take 6))
   )
-
-;; Takes too long getting to starting position
-(defn x-110 []
-  (= (first (palindromic (* 111111111 111111111)))
-     (* 111111111 111111111)))
-
-(defn x-111 []
-  (= (set (take 199 (palindromic 0)))
-     (set (map #(first (palindromic %)) (range 0 10000)))))
 
 (defn x-111a []
   (sort (take 199 (palindromic 0))))
@@ -2187,6 +2172,57 @@
   (= true
      (apply < (take 6666 (palindromic 9999999)))))
 
-(defn x-113 []
-  (= (nth (palindromic 0) 10101)
-     9102019))
+(defn y-1 []
+  (let [stop-w (sw/take-intervals-hof ["explain"])
+        res (= (take 26 (palindromic 0))
+               [0 1 2 3 4 5 6 7 8 9
+                11 22 33 44 55 66 77 88 99
+                101 111 121 131 141 151 161])]
+    (stop-w 10)
+    res))
+
+(defn y-2 []
+  (let [stop-w (sw/take-intervals-hof ["explain"])
+        res (= (take 16 (palindromic 162))
+               [171 181 191 202
+                212 222 232 242
+                252 262 272 282
+                292 303 313 323])]
+    (stop-w 10)
+    res))
+
+(defn y-3 []
+  (let [stop-w (sw/take-intervals-hof ["explain"])
+        res (= (take 6 (palindromic 1234550000))
+               [1234554321 1234664321 1234774321
+                1234884321 1234994321 1235005321])]
+    (stop-w 10)
+    res))
+
+(defn y-4 []
+  (let [stop-w (sw/take-intervals-hof ["explain"])
+        res (= (first (palindromic (* 111111111 111111111)))
+               (* 111111111 111111111))]
+    (stop-w 10)
+    res))
+
+(defn y-5 []
+  (let [stop-w (sw/take-intervals-hof ["explain"])
+        res (= (set (take 199 (palindromic 0)))
+               (set (map #(first (palindromic %)) (range 0 10000))))]
+    (stop-w 10)
+    res))
+
+(defn y-6 []
+  (let [stop-w (sw/take-intervals-hof ["explain"])
+        res (= true
+               (apply < (take 6666 (palindromic 9999999))))]
+    (stop-w 10)
+    res))
+
+(defn y-7 []
+  (let [stop-w (sw/take-intervals-hof ["explain"])
+        res (= (nth (palindromic 0) 10101)
+               9102019)]
+    (stop-w 10)
+    res))
