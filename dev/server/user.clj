@@ -27,6 +27,8 @@
    (apply println x "<--" msgs)
    x))
 
+(def probe-off identity)
+
 (defn x-1 []
   (let [common-prefix (fn [str1 str2]
                         (loop [acc-idx 0]
@@ -2118,45 +2120,40 @@
 (defn palindromic [n]
   (let [s (str n)
         str->int (fn [s] (Long/parseLong s))
-        following (fn [s]
-                    (if (every? #(= % \9) s)
-                      (-> s str->int inc inc str)
-                      (let [following-stop-w (sw/take-intervals-hof ["following"])
-                            greedy-grab-count (int (Math/ceil (/ (count s) 2)))
-                            [left right] [(take greedy-grab-count s) (drop greedy-grab-count s)]
-                            front (->> left (apply str) str->int inc str)
-                            back (->> front reverse (drop (- (count left) (count right))) (apply str))]
-                        (following-stop-w 0)
-                        (str front back))))
-        ;; Get non-eager front, reverse it, and put it on the back. Then iterate with `following` starting with
-        ;; that until >= (Long/parseLong s). Even doing all this, if s is palindromic? it will just be returned.
-        next (fn [s]
-               (println "next for" s)
-               (let [next-stop-w (sw/take-intervals-hof ["next"])
-                     n (str->int s)
-                     front-count (int (/ (count s) 2))
-                     front (apply str (take front-count s))
-                     reversed-front (apply str (reverse front))
-                     central (if (-> s count even?)
-                               ""
-                               (str (first (drop front-count s))))
-                     starter (str front
-                                  central
-                                  reversed-front)]
-                 (let [res (if (or (= "" starter) (= s starter))
-                             s
-                             (->> (iterate following starter)
-                                  (drop-while #(< (str->int %) n))
-                                  first))]
-                   (next-stop-w 0)
-                   res)))]
-    (->> (iterate following (next s))
+        following-f (fn [s]
+                      (if (every? #(= % \9) s)
+                        (-> s str->int inc inc str)
+                        (let [greedy-grab-count (int (Math/ceil (/ (count s) 2)))
+                              [left right] [(take greedy-grab-count s) (drop greedy-grab-count s)]
+                              front (->> left (apply str) str->int inc str)
+                              back (->> front reverse (drop (- (count left) (count right))) (apply str))]
+                          (str front back))))
+        next-f (fn [s]
+                 (let [front-count (int (/ (count s) 2))
+                       front (apply str (take front-count s))
+                       reversed-front (apply str (reverse front))
+                       reversed-back (->> s reverse (take front-count) (apply str))
+                       central (if (-> s count even?)
+                                 ""
+                                 (str (first (drop front-count s))))
+                       starter (if (= front reversed-back)
+                                 s
+                                 (if (and (-> s count odd?) (not= "9" central))
+                                   (str front (-> central str->int inc str) reversed-front)
+                                   (let [new-front (apply str (map (fn [f rb]
+                                                                     (max (-> f str str->int)
+                                                                          (-> rb str str->int))) front reversed-back))]
+                                     (str new-front
+                                          central
+                                          (apply str (reverse new-front))))))]
+                   starter))]
+    (->> (iterate following-f (next-f s))
          (map str->int))))
 
 (defn x-109 []
   (nth (palindromic 0) 10101)
   #_(->> (palindromic 1234550000)
-       (take 6))
+         (take 6))
   )
 
 (defn x-111a []
@@ -2174,7 +2171,7 @@
 
 (defn y-1 []
   (let [stop-w (sw/take-intervals-hof ["explain"])
-        res (= (take 26 (palindromic 0))
+        res (= (probe-off (take 26 (palindromic 0)))
                [0 1 2 3 4 5 6 7 8 9
                 11 22 33 44 55 66 77 88 99
                 101 111 121 131 141 151 161])]
@@ -2183,7 +2180,7 @@
 
 (defn y-2 []
   (let [stop-w (sw/take-intervals-hof ["explain"])
-        res (= (take 16 (palindromic 162))
+        res (= (probe-off (take 16 (palindromic 162)))
                [171 181 191 202
                 212 222 232 242
                 252 262 272 282
