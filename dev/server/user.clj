@@ -2118,16 +2118,16 @@
   (following-palindromic-2 "9"))
 
 (defn palindromic [n]
-  (let [s (str n)
-        str->int (fn [s] (Long/parseLong s))
-        following-f (fn [s]
-                      (if (every? #(= % \9) s)
-                        (-> s str->int inc inc str)
-                        (let [greedy-grab-count (int (Math/ceil (/ (count s) 2)))
-                              [left right] [(take greedy-grab-count s) (drop greedy-grab-count s)]
-                              front (->> left (apply str) str->int inc str)
-                              back (->> front reverse (drop (- (count left) (count right))) (apply str))]
-                          (str front back))))
+  (let [str->int (fn [s] (Long/parseLong s))
+        following-f (fn [n]
+                      (let [s (str n)]
+                        (if (every? #(= % \9) s)
+                          (str->int (-> s str->int inc inc str))
+                          (let [greedy-grab-count (int (Math/ceil (/ (count s) 2)))
+                                [left right] [(take greedy-grab-count s) (drop greedy-grab-count s)]
+                                front (->> left (apply str) str->int inc str)
+                                back (->> front reverse (drop (- (count left) (count right))) (apply str))]
+                            (str->int (str front back))))))
         next-f (fn [s]
                  (let [front-count (int (/ (count s) 2))
                        front (apply str (take front-count s))
@@ -2146,9 +2146,8 @@
                                      (str new-front
                                           central
                                           (apply str (reverse new-front))))))]
-                   starter))]
-    (->> (iterate following-f (next-f s))
-         (map str->int))))
+                   (str->int starter)))]
+    (iterate following-f (next-f (str n)))))
 
 (defn x-109 []
   (nth (palindromic 0) 10101)
