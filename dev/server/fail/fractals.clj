@@ -1,4 +1,4 @@
-(ns fractals
+(ns fail.fractals
   (:require [utils :as u]))
 
 (defn margin [inner outer]

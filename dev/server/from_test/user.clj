@@ -1,4 +1,4 @@
-(ns look-and-say)
+(ns from-test.user)
 
 (defn r []
   (require 'user :reload))

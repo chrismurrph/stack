@@ -1,4 +1,4 @@
-(ns pentagonal)
+(ns fail.pentagonal)
 
 (defn r []
   (require 'user :reload))

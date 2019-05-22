@@ -1,4 +1,4 @@
-(ns subset-sum)
+(ns fail.subset-sum)
 
 (defn r []
   (require 'user :reload))

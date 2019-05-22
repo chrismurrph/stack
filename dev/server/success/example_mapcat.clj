@@ -1,4 +1,4 @@
-(ns example-mapcat)
+(ns success.example-mapcat)
 
 (defn r []
   (require 'example-mapcat :reload))

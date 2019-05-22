@@ -1,4 +1,4 @@
-(ns fibo)
+(ns fail.fibo)
 
 (defn r []
   (require 'user :reload))

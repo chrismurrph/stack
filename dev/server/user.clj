@@ -2117,60 +2117,148 @@
 (defn x-108a []
   (following-palindromic-2 "9"))
 
-(defn palindromic [n]
-  (let [str->int (fn [s] (Long/parseLong s))
-        following-f (fn [n]
-                      (let [s (str n)]
-                        (if (every? #(= % \9) s)
-                          (str->int (-> s str->int inc inc str))
-                          (let [greedy-grab-count (int (Math/ceil (/ (count s) 2)))
-                                [left right] [(take greedy-grab-count s) (drop greedy-grab-count s)]
-                                front (->> left (apply str) str->int inc str)
-                                back (->> front reverse (drop (- (count left) (count right))) (apply str))]
-                            (str->int (str front back))))))
-        next-f (fn [s]
-                 (let [front-count (int (/ (count s) 2))
-                       front (apply str (take front-count s))
-                       reversed-front (apply str (reverse front))
-                       reversed-back (->> s reverse (take front-count) (apply str))
-                       central (if (-> s count even?)
-                                 ""
-                                 (str (first (drop front-count s))))
+(defn palindromic-1 [n]
+  (let [
+        ;; Rather than this fn have ch->n, which can just be a lookup table
+        xs->int (fn [xs] (Long/parseLong (apply str xs)))
+        ch->int {\0 0 \1 1 \2 2 \3 3 \4 4 \5 5 \6 6 \7 7 \8 8 \9 9}
+        int->seq (fn [n]
+                   (->> [n 10 []]
+                        (iterate (fn [[in mult res]]
+                                   (let [remainder (rem in mult)]
+                                     [(- in remainder) (* 10 mult) (conj res (quot remainder (/ mult 10)))])))
+                        (drop-while #(-> % first pos?)) first last reverse))
+        following-f (fn [xs]
+                      (if (every? #(= % \9) xs)
+                        (-> xs xs->int inc inc str)
+                        (let [greedy-grab-count (int (Math/ceil (/ (count xs) 2)))
+                              [left right] [(take greedy-grab-count xs) (drop greedy-grab-count xs)]
+                              front (->> left xs->int inc str)
+                              back (->> front reverse (drop (- (count left) (count right))))]
+                          (concat front back))))
+        next-f (fn [xs]
+                 (let [front-count (int (/ (count xs) 2))
+                       front (take front-count xs)
+                       reversed-front (reverse front)
+                       reversed-back (->> xs reverse (take front-count))
+                       central (when (-> xs count odd?)
+                                 (first (drop front-count xs)))
                        starter (if (= front reversed-back)
-                                 s
-                                 (if (and (-> s count odd?) (not= "9" central))
-                                   (str front (-> central str->int inc str) reversed-front)
-                                   (let [new-front (apply str (map (fn [f rb]
-                                                                     (max (-> f str str->int)
-                                                                          (-> rb str str->int))) front reversed-back))]
-                                     (str new-front
-                                          central
-                                          (apply str (reverse new-front))))))]
-                   (str->int starter)))]
-    (iterate following-f (next-f (str n)))))
+                                 xs
+                                 (if (and (-> xs count odd?) (not= \9 central))
+                                   (concat front (-> [central] xs->int inc str) reversed-front)
+                                   (let [new-front (->> (map (fn [f rb]
+                                                               (max (ch->int f) (ch->int rb))) front reversed-back)
+                                                        (apply str))]
+                                     (if central
+                                       (concat new-front [central] (reverse new-front))
+                                       (concat new-front (reverse new-front))))))]
+                   starter))]
+    (->> (iterate following-f (next-f (seq (str n))))
+         (map xs->int))))
 
-(defn x-109 []
-  (nth (palindromic 0) 10101)
-  #_(->> (palindromic 1234550000)
-         (take 6))
-  )
+(defn palindromic-2 [n]
+  (let [
+        ;; Rather than this fn have ch->n, which can just be a lookup table
+        seq->int (fn [xs]
+                   (assert (sequential? xs) xs)
+                   (if (seq xs)
+                     (Long/parseLong (apply str xs))
+                     0))
+        int->seq (fn [n]
+                   (assert (number? n) n)
+                   (if (< n 10)
+                     [n]
+                     (->> [n 10 []]
+                          (iterate (fn [[in mult res]]
+                                     (let [remainder (rem in mult)]
+                                       [(- in remainder) (* 10 mult) (conj res (quot remainder (/ mult 10)))])))
+                          (drop-while #(-> % first pos?)) first last reverse)))
+        ;; Implement this using loop/recur. Collect the integers using quot/rem as above. When have them know how
+        ;; many have gone thru, so mathematically reverse them and add them on the end.
+        following-f (fn [n]
+                      (assert (number? n) n)
+                      (let [xs (int->seq n)]
+                        (if (every? #(= % 9) xs)
+                          (-> n inc inc)
+                          (let [greedy-grab-count (int (Math/ceil (/ (count xs) 2)))
+                                [left right] [(take greedy-grab-count xs) (drop greedy-grab-count xs)]
+                                front (->> left seq->int inc int->seq)
+                                back (->> front reverse (drop (- (count left) (count right))))]
+                            (seq->int (concat front back))))))
+        next-f (fn [n]
+                 (assert (number? n) n)
+                 (let [xs (int->seq n)
+                       front-count (int (/ (count xs) 2))
+                       front (take front-count xs)
+                       reversed-front (reverse front)
+                       reversed-back (->> xs reverse (take front-count))
+                       central (when (-> xs count odd?)
+                                 (first (drop front-count xs)))]
+                   (if (= front reversed-back)
+                     xs
+                     (if (and (-> xs count odd?) (not= 9 central))
+                       (concat front [(-> central inc)] reversed-front)
+                       (let [new-front (map (fn [f rb]
+                                              (max f rb)) front reversed-back)
+                             reversed-new-front (reverse new-front)]
+                         (if central
+                           (concat new-front [central] reversed-new-front)
+                           (concat new-front reversed-new-front)))))))]
+    (->> (seq->int (next-f n))
+         (iterate following-f))))
 
-(defn x-111a []
-  (sort (take 199 (palindromic 0))))
+(defn palindromic-3 [n]
+  (let [seq->int (fn [xs]
+                   (assert (sequential? xs) xs)
+                   (if (seq xs)
+                     (Long/parseLong (apply str xs))
+                     0))
+        int->seq (fn [n]
+                   (assert (number? n) n)
+                   (if (< n 10)
+                     [n]
+                     (->> [n 10 []]
+                          (iterate (fn [[in mult res]]
+                                     (let [remainder (rem in mult)]
+                                       [(- in remainder) (* 10 mult) (conj res (quot remainder (/ mult 10)))])))
+                          (drop-while #(-> % first pos?)) first last reverse)))
+        following-f (fn [xs]
+                      (if (every? #(= % 9) xs)
+                        (-> xs seq->int inc inc int->seq)
+                        (let [greedy-grab-count (int (Math/ceil (/ (count xs) 2)))
+                              [left right] [(take greedy-grab-count xs) (drop greedy-grab-count xs)]
+                              front (->> left seq->int inc int->seq)
+                              back (->> front reverse (drop (- (count left) (count right))))]
+                          (concat front back))))
+        next-f (fn [n]
+                 (assert (number? n) n)
+                 (let [xs (int->seq n)
+                       front-count (int (/ (count xs) 2))
+                       front (take front-count xs)
+                       reversed-front (reverse front)
+                       reversed-back (->> xs reverse (take front-count))
+                       central (when (-> xs count odd?)
+                                 (first (drop front-count xs)))]
+                   (if (= front reversed-back)
+                     xs
+                     (if (and (-> xs count odd?) (not= 9 central))
+                       (concat front [(-> central inc)] reversed-front)
+                       (let [new-front (map (fn [f rb]
+                                              (max f rb)) front reversed-back)
+                             reversed-new-front (reverse new-front)]
+                         (if central
+                           (concat new-front [central] reversed-new-front)
+                           (concat new-front reversed-new-front)))))))]
+    (->> (next-f n)
+         (iterate following-f)
+         (map seq->int))))
 
-(defn x-111b []
-  (sort (distinct (map #(first (palindromic %)) (range 0 10000)))))
-
-(defn x-111c []
-  (map #(first (palindromic %)) (range 0 1000)))
-
-(defn x-112 []
-  (= true
-     (apply < (take 6666 (palindromic 9999999)))))
+(def palindromic palindromic-2)
 
 (defn y-1 []
   (let [stop-w (sw/take-intervals-hof ["explain"])
-        res (= (probe-off (take 26 (palindromic 0)))
+        res (= (probe-off (take 26 (palindromic-2 0)))
                [0 1 2 3 4 5 6 7 8 9
                 11 22 33 44 55 66 77 88 99
                 101 111 121 131 141 151 161])]
@@ -2189,7 +2277,7 @@
 
 (defn y-3 []
   (let [stop-w (sw/take-intervals-hof ["explain"])
-        res (= (take 6 (palindromic 1234550000))
+        res (= (probe-off (vec (take 6 (palindromic 1234550000))))
                [1234554321 1234664321 1234774321
                 1234884321 1234994321 1235005321])]
     (stop-w 10)
@@ -2222,3 +2310,40 @@
                9102019)]
     (stop-w 10)
     res))
+
+(defn x-111a []
+  (take 3 (palindromic 0)))
+
+(defn x-111b []
+  (sort (distinct (map #(first (palindromic %)) (range 0 10000)))))
+
+(defn x-111c []
+  (map #(first (palindromic %)) (range 0 1000)))
+
+(defn int->seq-1 [n]
+  [(quot n 100) (rem n 100)])
+
+(defn int->seq-2 [n]
+  (->> [n 10 []]
+       (iterate (fn [[in mult res]]
+                  (let [remainder (rem in mult)]
+                    [(- in remainder) (* 10 mult) (conj res (quot remainder (/ mult 10)))])))
+       (drop-while #(-> % first pos?)) first last reverse))
+
+(defn x-112 []
+  (int->seq-2 1))
+
+;; #(quot % 10) grabs all but the last digit
+;; #(mod % 10) grabs the last digit
+;; #(* % 10) moves the number one to the left
+;; To mirror we start off with the number and as we move it to the left we put what we
+;; grab from a separate version of it, each time chewing the last digit off
+;; If the number is odd we need to have chewed one before we even start.
+(defn mirror [[num dig]]
+  (loop [l num, r (if (= dig :even) num (quot num 10))]
+    (if (= 0 r)
+      l
+      (recur (+ (* l 10) (rem r 10)), (quot r 10)))))
+
+(defn x-113 []
+  (mirror [1234 :even]))

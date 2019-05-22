@@ -1,4 +1,4 @@
-(ns jumping-bunnies)
+(ns success.jumping-bunnies)
 
 (defn r []
   (require 'jumping-bunnies :reload))
