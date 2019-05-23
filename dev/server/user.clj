@@ -2184,7 +2184,7 @@
                           (let [greedy-grab-count (int (Math/ceil (/ (count xs) 2)))
                                 [left right] [(take greedy-grab-count xs) (drop greedy-grab-count xs)]
                                 front (->> left seq->int inc int->seq)
-                                back (->> front reverse (drop (- (count left) (count right))))]
+                                back (->> front reverse (drop (- (count left) (- (count xs) (count left)))))]
                             (seq->int (concat front back))))))
         next-f (fn [n]
                  (assert (number? n) n)
@@ -2206,59 +2206,156 @@
                            (concat new-front [central] reversed-new-front)
                            (concat new-front reversed-new-front)))))))]
     (->> (seq->int (next-f n))
+         ((fn [n] n))
          (iterate following-f))))
 
-(defn palindromic-3 [n]
-  (let [seq->int (fn [xs]
-                   (assert (sequential? xs) xs)
-                   (if (seq xs)
-                     (Long/parseLong (apply str xs))
-                     0))
-        int->seq (fn [n]
-                   (assert (number? n) n)
-                   (if (< n 10)
-                     [n]
-                     (->> [n 10 []]
-                          (iterate (fn [[in mult res]]
-                                     (let [remainder (rem in mult)]
-                                       [(- in remainder) (* 10 mult) (conj res (quot remainder (/ mult 10)))])))
-                          (drop-while #(-> % first pos?)) first last reverse)))
-        following-f (fn [xs]
-                      (if (every? #(= % 9) xs)
-                        (-> xs seq->int inc inc int->seq)
-                        (let [greedy-grab-count (int (Math/ceil (/ (count xs) 2)))
-                              [left right] [(take greedy-grab-count xs) (drop greedy-grab-count xs)]
-                              front (->> left seq->int inc int->seq)
-                              back (->> front reverse (drop (- (count left) (count right))))]
-                          (concat front back))))
-        next-f (fn [n]
-                 (assert (number? n) n)
-                 (let [xs (int->seq n)
-                       front-count (int (/ (count xs) 2))
-                       front (take front-count xs)
-                       reversed-front (reverse front)
-                       reversed-back (->> xs reverse (take front-count))
-                       central (when (-> xs count odd?)
-                                 (first (drop front-count xs)))]
-                   (if (= front reversed-back)
-                     xs
-                     (if (and (-> xs count odd?) (not= 9 central))
-                       (concat front [(-> central inc)] reversed-front)
-                       (let [new-front (map (fn [f rb]
-                                              (max f rb)) front reversed-back)
-                             reversed-new-front (reverse new-front)]
-                         (if central
-                           (concat new-front [central] reversed-new-front)
-                           (concat new-front reversed-new-front)))))))]
-    (->> (next-f n)
-         (iterate following-f)
-         (map seq->int))))
+(defn int->seq-1 [n]
+  [(quot n 100) (rem n 100)])
 
-(def palindromic palindromic-2)
+(defn int->seq-2 [n]
+  (->> [n 10 []]
+       (iterate (fn [[in mult res]]
+                  (let [remainder (rem in mult)]
+                    [(- in remainder) (* 10 mult) (conj res (quot remainder (/ mult 10)))])))
+       (drop-while #(-> % first pos?)) first last reverse))
+
+(defn x-112 []
+  (int->seq-2 1))
+
+;; #(quot % 10) grabs all but the last digit
+;; #(mod % 10) grabs the last digit
+;; #(* % 10) moves the number one to the left
+;; To mirror we start off with the number and as we move it to the left we put what we
+;; grab from a separate version of it, each time chewing the last digit off
+;; If the number is odd we need to have chewed one before we even start.
+(defn mirror [[num dig]]
+  (loop [l num, r (if (= dig :even) num (quot num 10))]
+    (if (= 0 r)
+      l
+      (recur (+ (* l 10) (rem r 10)), (quot r 10)))))
+
+(defn x-113 []
+  (mirror [[1234 :even]]))
+
+(defn init [n]
+  (let [left-part (fn [n]
+                    (let [s (str n)
+                          size (count s)
+                          l (subs s 0 (if (odd? size)
+                                        (inc (quot size 2))
+                                        (quot size 2)))]
+                      [(Long/parseLong l)
+                       (even? (count l))
+                       (long (Math/pow 10 (count l)))]))]
+    (left-part n)))
+
+;; Usually just increment, but when goal is reached even will change to odd
+(defn increment [[n even? goal]]
+  (println "increment" [n even? goal])
+  (let [next-n (inc n)]
+    (if (= next-n goal)
+      [next-n (not even?) (* 10 goal)]
+      [next-n even? goal])))
+
+#_(defn x-113a []
+    (increment [1234 :even]))
+
+;; answer, right, power. Both start off as n. We grab single digits from right and put them on the end of answer,
+;; mathematically.
+;; To put on end * by power and add last digit of right
+;; right will be chomped down as go, so when its zero we've finished
+;; Grabbing r-most is just remainder after divide by 10
+;; Numerator of same divide is what we keep of right for next recursion.
+;;
+(defn mirror [[n even?]]
+  (loop [answer n
+         right (if even?
+                 n
+                 (quot n 10))]
+    (if (zero? right)
+      answer
+      (recur (+ (* answer 10)
+                (rem right 10))
+             (quot right 10)))))
+
+(defn x-114 []
+  (->> (iterate increment (init 99755))
+       (take 10)
+       (map mirror)))
+
+(defn x-115 []
+  (mirror [10 true 100])
+  ;(mirror [998 false 1000])
+  )
+
+(defn palindrome-1 [n]
+  (let [init-1 (memoize (fn [n]
+                          (let [s (str n)
+                                size (count s)
+                                even? (even? size)
+                                l (subs s 0 (if (not even?)
+                                              (inc (quot size 2))
+                                              (quot size 2)))]
+                            [(Long/parseLong l)
+                             even?
+                             (long (Math/pow 10 size))])))
+        even-digits? #(even? (count %))
+        left-middle #(if (even-digits? %)
+                       (subs % 0 (quot (count %) 2))
+                       (subs % 0 (inc (quot (count %) 2))))
+        init-2 #(let [s (left-middle %)]
+                  (vector (Long/parseLong s)
+                          (even-digits? %)
+                          (long (Math/pow 10 (count s)))))
+        increment (fn [[n even? goal]]
+                    (let [next-n (inc n)]
+                      (if (= next-n goal)
+                        (if even?
+                          [goal false (* 10 goal)]
+                          [(quot goal 10) true goal])
+                        [next-n even? goal])))
+        mirror (fn [[n even?]]
+                 (loop [answer n
+                        right (if even?
+                                n
+                                (quot n 10))]
+                   (if (zero? right)
+                     answer
+                     (recur (+ (* answer 10)
+                               (rem right 10))
+                            (quot right 10)))))]
+    (->> (iterate increment (init-1 n))
+         (map mirror)
+         (filter #(>= % n)))))
+
+(defn palindrome-2 [n]
+  (let [to-digits (fn [k] (mapv #(rem (quot k %) 10)
+                                (take-while #(< 0 (quot k %)) (iterate #(* 10 %) 1))))
+        to-number (fn [k] (apply + (map * k (iterate #(* 10 %) 1))))
+        mirror (fn [[num even?]]
+                 (let [digits (to-digits num)]
+                   (if even? (concat (reverse digits) digits)
+                             (concat (reverse (drop 1 digits)) digits))))
+        init #(let [left-digits (subvec % (quot (count %) 2))]
+                [(to-number left-digits)
+                 (even? (count %))
+                 (long (Math/pow 10 (count left-digits)))])
+        nextp (fn [[num even? goal]]
+                (let [m (inc num)]
+                  (if (= m goal)
+                    (if even?
+                      [goal false (* 10 goal)]
+                      [(/ goal 10) true goal])
+                    [m even? goal])))]
+    (->> (iterate nextp (init (to-digits n)))
+         (map (comp to-number mirror))
+         (filter (partial <= n)))))
+
+(def palindromic palindrome-2)
 
 (defn y-1 []
   (let [stop-w (sw/take-intervals-hof ["explain"])
-        res (= (probe-off (take 26 (palindromic-2 0)))
+        res (= (probe-on (take 26 (palindromic 0)))
                [0 1 2 3 4 5 6 7 8 9
                 11 22 33 44 55 66 77 88 99
                 101 111 121 131 141 151 161])]
@@ -2267,7 +2364,7 @@
 
 (defn y-2 []
   (let [stop-w (sw/take-intervals-hof ["explain"])
-        res (= (probe-off (take 16 (palindromic 162)))
+        res (= (probe-on (take 16 (palindromic 162)))
                [171 181 191 202
                 212 222 232 242
                 252 262 272 282
@@ -2311,39 +2408,36 @@
     (stop-w 10)
     res))
 
-(defn x-111a []
-  (take 3 (palindromic 0)))
+(defn y-8 []
+  (vec (take 1 (palindromic 162))))
 
-(defn x-111b []
+(defn y-9 []
   (sort (distinct (map #(first (palindromic %)) (range 0 10000)))))
 
-(defn x-111c []
+(defn y-10 []
   (map #(first (palindromic %)) (range 0 1000)))
 
-(defn int->seq-1 [n]
-  [(quot n 100) (rem n 100)])
-
-(defn int->seq-2 [n]
-  (->> [n 10 []]
-       (iterate (fn [[in mult res]]
-                  (let [remainder (rem in mult)]
-                    [(- in remainder) (* 10 mult) (conj res (quot remainder (/ mult 10)))])))
-       (drop-while #(-> % first pos?)) first last reverse))
-
-(defn x-112 []
-  (int->seq-2 1))
-
-;; #(quot % 10) grabs all but the last digit
-;; #(mod % 10) grabs the last digit
-;; #(* % 10) moves the number one to the left
-;; To mirror we start off with the number and as we move it to the left we put what we
-;; grab from a separate version of it, each time chewing the last digit off
-;; If the number is odd we need to have chewed one before we even start.
-(defn mirror [[num dig]]
-  (loop [l num, r (if (= dig :even) num (quot num 10))]
-    (if (= 0 r)
-      l
-      (recur (+ (* l 10) (rem r 10)), (quot r 10)))))
-
-(defn x-113 []
-  (mirror [1234 :even]))
+(defn palindrome [n]
+  (let [to-digits (fn [k] (mapv #(mod (quot k %) 10)
+                                (take-while #(< 0 (quot k %)) (iterate #(* 10 %) 1))))
+        to-number (fn [k] (apply + (map * k (iterate #(* 10 %) 1))))
+        left-digits #(subvec % (/ (count %) 2))
+        even-digits? #(even? (count %))
+        mirror (fn [[num dig]]
+                 (let [digits (to-digits num)]
+                   (if (= :even dig) (concat (reverse digits) digits)
+                                     (concat (reverse (drop 1 digits)) digits))))
+        init #(let [ld (left-digits %)]
+                (vector (to-number ld)
+                        (if (even-digits? %) :even :odd)
+                        (long (Math/pow 10 (count ld)))))
+        nextp (fn [[num even goal]]
+                (let [m (inc num)]
+                  (if (= m goal)
+                    (if (= even :even)
+                      [goal :odd (* 10 goal)]
+                      [(/ goal 10) :even goal])
+                    [m even goal])))
+        i (init (to-digits n))
+        palindromes (iterate nextp i)]
+    (filter (partial <= n) (map (comp to-number mirror) palindromes))))
